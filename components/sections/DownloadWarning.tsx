@@ -14,7 +14,7 @@ export function DownloadWarning({ games, onConfirm, onCancel }: Props) {
     <div className="overlay" role="dialog" aria-modal="true" aria-labelledby="dl-title">
       <div className="overlay-card" style={{ maxWidth: 720, textAlign: "left" }}>
         <div className="overlay-eyebrow" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <IconAlert size={14} /> // Pré-flight check
+          <IconAlert size={14} /> Pré-flight check
         </div>
         <h2 id="dl-title" className="overlay-title" style={{ fontSize: "clamp(28px, 4vw, 44px)" }}>
           Avant de lancer

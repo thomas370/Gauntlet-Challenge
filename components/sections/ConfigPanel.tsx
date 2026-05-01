@@ -20,7 +20,7 @@ export function ConfigPanel({
     <section className="panel">
       <div className="panel-head">
         <div>
-          <div className="panel-num">// 01 — Setup</div>
+          <div className="panel-num">01 / setup</div>
           <h2 className="panel-title">Configuration</h2>
         </div>
         <div className="panel-meta">{playerCount} joueurs · {difficulty}</div>
@@ -58,46 +58,46 @@ export function ConfigPanel({
         </div>
       </div>
 
-      <div className="field" style={{ marginTop: 24 }}>
+      <div className="field" style={{ marginTop: 28 }}>
         <label className="field-label">Difficulté</label>
-        <div className="toggle-group" role="tablist">
+        <div className="segmented" role="tablist">
           <button
             role="tab"
             aria-selected={difficulty === "normal"}
-            className={`toggle ${difficulty === "normal" ? "active" : ""}`}
+            className={`seg ${difficulty === "normal" ? "active" : ""}`}
             onClick={() => onDifficultyChange("normal")}
           >
-            <IconTarget /> Normal
+            <IconTarget size={12} /> Normal
           </button>
           <button
             role="tab"
             aria-selected={difficulty === "hardcore"}
-            className={`toggle ${difficulty === "hardcore" ? "active danger" : ""}`}
+            className={`seg ${difficulty === "hardcore" ? "active" : ""}`}
             onClick={() => onDifficultyChange("hardcore")}
           >
-            <IconFlame /> Hardcore
+            <IconFlame size={12} /> Hardcore
           </button>
         </div>
       </div>
 
-      <div className="field" style={{ marginTop: 16 }}>
+      <div className="field" style={{ marginTop: 20 }}>
         <label className="field-label">Pénalité en cas de défaite</label>
-        <div className="toggle-group" role="tablist">
+        <div className="segmented" role="tablist">
           <button
             role="tab"
             aria-selected={penaltyMode === "reset"}
-            className={`toggle ${penaltyMode === "reset" ? "active" : ""}`}
+            className={`seg ${penaltyMode === "reset" ? "active" : ""}`}
             onClick={() => onPenaltyChange("reset")}
           >
-            <IconSkull /> Reset complet
+            <IconSkull size={12} /> Reset complet
           </button>
           <button
             role="tab"
             aria-selected={penaltyMode === "stepback"}
-            className={`toggle ${penaltyMode === "stepback" ? "active" : ""}`}
+            className={`seg ${penaltyMode === "stepback" ? "active" : ""}`}
             onClick={() => onPenaltyChange("stepback")}
           >
-            <IconArrowLeft /> Recule d'un jeu
+            <IconArrowLeft size={12} /> Recule d'un jeu
           </button>
         </div>
       </div>

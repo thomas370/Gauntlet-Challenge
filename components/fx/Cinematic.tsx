@@ -34,8 +34,8 @@ export function Cinematic({ nextGameName, nextIdx, onDone }: Props) {
   return (
     <div className="cinematic" role="alert" aria-live="assertive">
       <div className="cinematic-inner">
-        <div className="cinematic-eyebrow">// Jeu {String(nextIdx + 1).padStart(2, "0")} · entrant</div>
-        <div key={n} className="cinematic-num">{n > 0 ? n : "GO"}</div>
+        <div className="cinematic-eyebrow">Jeu {String(nextIdx + 1).padStart(2, "0")} · entrant</div>
+        <div key={n} className={`cinematic-num ${n === 0 ? "go" : ""}`}>{n > 0 ? n : "GO"}</div>
         <div className="cinematic-game">{nextGameName}</div>
         <div className="cinematic-skip">[espace] passer</div>
       </div>

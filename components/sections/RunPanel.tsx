@@ -30,7 +30,7 @@ export function RunPanel({
     <section className="panel" id="runPanel">
       <div className="panel-head">
         <div>
-          <div className="panel-num">// 03 — Run</div>
+          <div className="panel-num">03 / run</div>
           <h2 className="panel-title">Gauntlet en cours</h2>
         </div>
         <div className="panel-meta">{done.length} / {run.length || 10} validés</div>

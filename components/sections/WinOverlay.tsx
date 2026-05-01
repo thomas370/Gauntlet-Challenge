@@ -117,7 +117,7 @@ export function WinOverlay({ totalMs, attempt, difficulty, players, isPB, previo
   return (
     <div className="overlay win" role="dialog" aria-modal="true">
       <div className="overlay-card" style={{ maxWidth: 880 }}>
-        <div className="overlay-eyebrow">// Gauntlet completed</div>
+        <div className="overlay-eyebrow">Gauntlet completed</div>
         <h2 className="overlay-title">10 / 10</h2>
         <p className="overlay-msg">
           {isPB

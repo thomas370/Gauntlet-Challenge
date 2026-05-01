@@ -34,8 +34,8 @@ export function TopBar({ run, done, current, flashLossIdx, startTs, pbMs }: Prop
   return (
     <div className="topbar">
       <div className="brand">
-        <div className="brand-mark" aria-hidden="true">G</div>
-        <div className="brand-text">Gauntlet<em>//</em>Challenge</div>
+        <span className="brand-mark" aria-hidden="true" />
+        <div className="brand-text">gauntlet<em>/challenge</em></div>
       </div>
 
       <nav className="chain" aria-label="Progression de la run">
@@ -50,9 +50,7 @@ export function TopBar({ run, done, current, flashLossIdx, startTs, pbMs }: Prop
             flash ? "flash-loss" : ""
           ].filter(Boolean).join(" ");
           return (
-            <div key={i} className={cls} title={`Jeu ${i + 1}`}>
-              {String(i + 1).padStart(2, "0")}
-            </div>
+            <div key={i} className={cls} title={`Jeu ${i + 1}`} aria-label={`Jeu ${i + 1} ${isDone ? "validé" : isCurrent ? "en cours" : "à venir"}`} />
           );
         })}
       </nav>
@@ -62,7 +60,7 @@ export function TopBar({ run, done, current, flashLossIdx, startTs, pbMs }: Prop
           {formatTime(elapsed)}
         </div>
         <div className={`timer-sub ${pbMs && elapsed > 0 && elapsed < pbMs ? "pb" : ""}`}>
-          {pbMs ? `PB ${formatTime(pbMs)}` : "No PB yet"}
+          {pbMs ? `pb · ${formatTime(pbMs)}` : "no pb"}
         </div>
       </div>
     </div>
