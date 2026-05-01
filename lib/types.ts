@@ -14,6 +14,21 @@ export interface Game {
 export type Difficulty = "normal" | "hardcore";
 export type PenaltyMode = "reset" | "stepback";
 
+export interface RunHistoryEntry {
+  id: number;
+  ts: number;
+  outcome: "win" | "lose";
+  attempts: number;
+  duration: number;
+  difficulty: Difficulty;
+  penaltyMode: PenaltyMode;
+  runIds: number[];
+  failedGameId: number | null;
+  championPicks: Record<number, string>;
+  completed: number;
+  total: number;
+}
+
 export interface GauntletState {
   attempt: number;
   current: number;
@@ -27,6 +42,11 @@ export interface GauntletState {
   done: number[];
   filter: string;
   search: string;
+  soundEnabled: boolean;
+  showHistory: boolean;
+  runStartTime: number | null;
+  runFails: Record<number, number>;
+  history: RunHistoryEntry[];
 }
 
 export const DEFAULT_STATE: GauntletState = {
@@ -42,4 +62,9 @@ export const DEFAULT_STATE: GauntletState = {
   done: [],
   filter: "all",
   search: "",
+  soundEnabled: true,
+  showHistory: false,
+  runStartTime: null,
+  runFails: {},
+  history: [],
 };
