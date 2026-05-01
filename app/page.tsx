@@ -1,17 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { POOL, getCategories, effectiveMode } from "@/lib/games";
-import { CAT_ICONS } from "@/lib/icons";
-import {
-  DEFAULT_STATE,
-  type GauntletState,
-  type Difficulty,
-  type PenaltyMode,
-  type Game,
-} from "@/lib/types";
+import { DEFAULT_STATE, type GauntletState, type Difficulty, type PenaltyMode } from "@/lib/types";
+import { loadPB, recordRun, formatTime } from "@/lib/timer";
+
+import { TopBar } from "@/components/sections/TopBar";
+import { Hero } from "@/components/sections/Hero";
+import { ConfigPanel } from "@/components/sections/ConfigPanel";
+import { PoolPanel } from "@/components/sections/PoolPanel";
+import { RunPanel } from "@/components/sections/RunPanel";
+import { RulesBlock } from "@/components/sections/RulesBlock";
+import { DownloadWarning } from "@/components/sections/DownloadWarning";
+import { WinOverlay } from "@/components/sections/WinOverlay";
+import { LoseOverlay } from "@/components/sections/LoseOverlay";
+import { Cinematic } from "@/components/fx/Cinematic";
+import { Konami } from "@/components/fx/Konami";
+import { IconTrash } from "@/lib/icons-svg";
 
 const STORAGE_KEY = "gauntlet_v2";
+const TIMER_KEY = "gauntlet_timer_v1";
+
+interface TimerState {
+  startTs: number | null;
+  lastTotalMs: number;
+}
+
+const DEFAULT_TIMER: TimerState = { startTs: null, lastTotalMs: 0 };
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -24,75 +39,117 @@ function shuffle<T>(arr: T[]): T[] {
 
 export default function Page() {
   const [state, setState] = useState<GauntletState>(DEFAULT_STATE);
+  const [timer, setTimer] = useState<TimerState>(DEFAULT_TIMER);
   const [hydrated, setHydrated] = useState(false);
-  const [overlay, setOverlay] = useState<{ kind: "win" | "lose" | null; msg?: string }>({ kind: null });
+
+  const [pendingRun, setPendingRun] = useState<number[] | null>(null);
+  const [overlay, setOverlay] = useState<
+    | { kind: null }
+    | { kind: "win"; totalMs: number; isPB: boolean; previousBestMs?: number }
+    | { kind: "lose"; msg: string }
+  >({ kind: null });
   const [drawingFor, setDrawingFor] = useState<number | null>(null);
   const [drawingDisplay, setDrawingDisplay] = useState<string>("");
   const [swappedIdx, setSwappedIdx] = useState<number | null>(null);
-  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flashLossIdx, setFlashLossIdx] = useState<number | null>(null);
+  const [cinematic, setCinematic] = useState<{ idx: number; name: string } | null>(null);
+  const [pbMs, setPbMs] = useState<number | null>(null);
 
-  // Hydrate from localStorage on mount
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Hydrate
   useEffect(() => {
     try {
       const raw = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        setState({ ...DEFAULT_STATE, ...parsed });
-      }
-    } catch (e) {
-      console.warn("Load failed", e);
-    }
+      if (raw) setState({ ...DEFAULT_STATE, ...JSON.parse(raw) });
+      const tRaw = typeof window !== "undefined" ? localStorage.getItem(TIMER_KEY) : null;
+      if (tRaw) setTimer({ ...DEFAULT_TIMER, ...JSON.parse(tRaw) });
+      const pb = loadPB();
+      const next = pb.best?.totalMs ?? null;
+      setPbMs(next);
+    } catch (e) { console.warn(e); }
     setHydrated(true);
   }, []);
 
-  // Persist on every change
+  // Persist state
   useEffect(() => {
     if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch (e) {
-      console.warn("Save failed", e);
-    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {}
   }, [state, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    try { localStorage.setItem(TIMER_KEY, JSON.stringify(timer)); } catch {}
+  }, [timer, hydrated]);
+
+  // Refresh PB when difficulty changes
+  useEffect(() => {
+    if (!hydrated) return;
+    const pb = loadPB();
+    setPbMs(state.difficulty === "hardcore" ? pb.bestHardcore?.totalMs ?? null : pb.best?.totalMs ?? null);
+  }, [state.difficulty, hydrated]);
 
   // === HELPERS ===
   const update = (patch: Partial<GauntletState>) => setState((s) => ({ ...s, ...patch }));
 
   const togglePin = (id: number) => {
     setState((s) => {
-      if (s.pinned.includes(id)) {
-        return { ...s, pinned: s.pinned.filter((x) => x !== id) };
-      } else if (s.pinned.length < 5) {
-        return { ...s, pinned: [...s.pinned, id] };
-      } else {
+      if (s.pinned.includes(id)) return { ...s, pinned: s.pinned.filter((x) => x !== id) };
+      if (s.pinned.length >= 5) {
         alert("Maximum 5 jeux épinglés. Retire-en un avant d'en ajouter un autre.");
         return s;
       }
+      return { ...s, pinned: [...s.pinned, id] };
     });
   };
 
-  const generateRun = () => {
-    setState((s) => {
-      const pinned = [...s.pinned];
-      const others = POOL.filter((g) => !pinned.includes(g.id));
-      const remainingNeeded = 10 - pinned.length;
-      if (remainingNeeded > others.length) {
-        alert("Pas assez de jeux dans le pool !");
-        return s;
-      }
-      const random = shuffle(others).slice(0, remainingNeeded).map((g) => g.id);
-      const run = shuffle([...pinned, ...random]);
-      return { ...s, run, current: 0, done: [], champions: {}, attempt: 1 };
-    });
+  const buildRun = (currentState: GauntletState): number[] => {
+    const pinned = [...currentState.pinned];
+    const others = POOL.filter((g) => !pinned.includes(g.id));
+    const remaining = 10 - pinned.length;
+    if (remaining > others.length) {
+      alert("Pas assez de jeux dans le pool !");
+      return [];
+    }
+    const random = shuffle(others).slice(0, remaining).map((g) => g.id);
+    return shuffle([...pinned, ...random]);
+  };
+
+  // Generate -> stage as pendingRun -> show DownloadWarning
+  const requestGenerate = () => {
+    const run = buildRun(state);
+    if (run.length === 0) return;
+    if (state.run.length > 0 && state.done.length > 0) {
+      if (!confirm("Une run est en cours. Générer une nouvelle run effacera la progression. Continuer ?")) return;
+    }
+    setPendingRun(run);
+  };
+
+  const confirmStartRun = () => {
+    if (!pendingRun) return;
+    const startTs = Date.now();
+    setState((s) => ({
+      ...s,
+      run: pendingRun,
+      current: 0,
+      done: [],
+      champions: {},
+      attempt: 1,
+    }));
+    setTimer({ startTs, lastTotalMs: 0 });
+    setPendingRun(null);
     setTimeout(() => {
       document.getElementById("runPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);
   };
 
+  const cancelStartRun = () => setPendingRun(null);
+
   const rerollRun = () => {
     if (state.run.length === 0) return;
     if (state.done.length > 0 && !confirm("Une run est en cours. Re-roll va tout remettre à zéro. Continuer ?")) return;
-    generateRun();
+    requestGenerate();
   };
 
   const swapGame = (gameId: number) => {
@@ -114,7 +171,6 @@ export default function Page() {
       const newPinned = s.pinned.filter((x) => x !== gameId);
       const newChampions = { ...s.champions };
       delete newChampions[gameId];
-      // Trigger flash animation
       setSwappedIdx(idx);
       if (swapTimer.current) clearTimeout(swapTimer.current);
       swapTimer.current = setTimeout(() => setSwappedIdx(null), 700);
@@ -132,7 +188,6 @@ export default function Page() {
       alert("Il faut au moins 2 joueurs pour un duo.");
       return;
     }
-
     setDrawingFor(gameId);
     let spins = 0;
     const totalSpins = 22;
@@ -167,11 +222,32 @@ export default function Page() {
       if (s.done.includes(gameId)) return s;
       const newDone = [...s.done, gameId];
       const newCurrent = s.current + 1;
-      const next = { ...s, done: newDone, current: newCurrent };
-      if (newDone.length === s.run.length) {
-        setTimeout(() => setOverlay({ kind: "win" }), 400);
+      const isLast = newDone.length === s.run.length;
+
+      if (isLast) {
+        const totalMs = timer.startTs ? Date.now() - timer.startTs : 0;
+        setTimeout(() => {
+          const { newPB, previousBest } = recordRun({
+            totalMs,
+            perGame: {},
+            difficulty: s.difficulty,
+            attempt: s.attempt,
+            date: new Date().toISOString(),
+          });
+          setOverlay({ kind: "win", totalMs, isPB: newPB, previousBestMs: previousBest?.totalMs });
+          setTimer({ startTs: null, lastTotalMs: totalMs });
+          const pb = loadPB();
+          setPbMs(s.difficulty === "hardcore" ? pb.bestHardcore?.totalMs ?? null : pb.best?.totalMs ?? null);
+        }, 400);
+      } else {
+        const nextGameId = s.run[newCurrent];
+        const nextG = POOL.find((g) => g.id === nextGameId);
+        if (nextG) {
+          setTimeout(() => setCinematic({ idx: newCurrent, name: nextG.name }), 200);
+        }
       }
-      return next;
+
+      return { ...s, done: newDone, current: newCurrent };
     });
   };
 
@@ -182,26 +258,26 @@ export default function Page() {
       let msg = "";
       let next: GauntletState;
 
+      // Flash chain at lost index
+      setFlashLossIdx(idx);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashLossIdx(null), 700);
+
       if (s.penaltyMode === "stepback") {
         if (idx <= 0) {
-          msg = `Défaite sur ${g?.name ?? "ce jeu"}. Tu es au jeu 1, impossible de reculer plus — réessaye !`;
+          msg = `Défaite sur ${g?.name ?? "ce jeu"}. Tu es au jeu 1, impossible de reculer plus — réessaye.`;
           next = { ...s, attempt: s.attempt + 1 };
         } else {
           const prevGameId = s.run[idx - 1];
           const prevG = POOL.find((x) => x.id === prevGameId);
-          msg = `Défaite sur ${g?.name ?? "ce jeu"}. Tu recules d'un jeu : retour sur ${
-            prevG?.name ?? "le jeu précédent"
-          } (jeu #${idx}).`;
-          next = {
-            ...s,
-            attempt: s.attempt + 1,
-            current: idx - 1,
-            done: s.done.filter((x) => x !== prevGameId),
-          };
+          msg = `Défaite sur ${g?.name ?? "ce jeu"}. Retour sur ${prevG?.name ?? "le jeu précédent"} (jeu #${idx}).`;
+          next = { ...s, attempt: s.attempt + 1, current: idx - 1, done: s.done.filter((x) => x !== prevGameId) };
         }
       } else {
         msg = `Défaite sur ${g?.name ?? "ce jeu"}. Tentative #${s.attempt + 1} — la run recommence depuis le jeu 1.`;
         next = { ...s, attempt: s.attempt + 1, current: 0, done: [], champions: {} };
+        // Reset timer on full reset penalty
+        setTimer({ startTs: Date.now(), lastTotalMs: 0 });
       }
 
       setOverlay({ kind: "lose", msg });
@@ -210,401 +286,149 @@ export default function Page() {
   };
 
   const fullReset = () => {
-    setState((s) => ({
-      ...s,
-      attempt: 1,
-      current: 0,
-      done: [],
-      champions: {},
-      run: [],
-    }));
+    setState((s) => ({ ...s, attempt: 1, current: 0, done: [], champions: {}, run: [] }));
+    setTimer(DEFAULT_TIMER);
   };
 
   const hardReset = () => {
     if (!confirm("Reset complet ? Toute la progression et les épinglages seront effacés.")) return;
     setState((s) => ({ ...DEFAULT_STATE, difficulty: s.difficulty, penaltyMode: s.penaltyMode, players: s.players, playerCount: s.playerCount }));
+    setTimer(DEFAULT_TIMER);
   };
 
   // === DERIVED ===
-  const filteredPool = POOL.filter(
-    (g) =>
-      (state.filter === "all" || g.cat === state.filter) &&
-      (!state.search || g.name.toLowerCase().includes(state.search.toLowerCase()))
+  const filteredPool = useMemo(
+    () => POOL.filter(
+      (g) =>
+        (state.filter === "all" || g.cat === state.filter) &&
+        (!state.search || g.name.toLowerCase().includes(state.search.toLowerCase()))
+    ),
+    [state.filter, state.search]
   );
 
-  const progressPct = state.run.length === 0 ? 0 : (state.done.length / state.run.length) * 100;
+  const pendingRunGames = useMemo(
+    () => pendingRun ? pendingRun.map((id) => POOL.find((g) => g.id === id)).filter(Boolean) as any[] : [],
+    [pendingRun]
+  );
 
   if (!hydrated) {
-    // Avoid hydration mismatch — render skeleton until localStorage is loaded
     return (
-      <div className="container">
-        <div className="hero">
-          <h1>GAUNTLET CHALLENGE</h1>
-          <div className="subtitle">Chargement…</div>
-        </div>
-      </div>
+      <main className="shell">
+        <Hero attempt={1} difficulty="normal" inRun={false} />
+        <div className="empty-run"><h3>Chargement…</h3></div>
+      </main>
     );
   }
 
   return (
-    <div className="container">
-      {/* HERO */}
-      <div className="hero">
-        <h1>GAUNTLET CHALLENGE</h1>
-        <div className="subtitle">10 jeux · 0 défaite autorisée</div>
-        <div className="lives">⚡ TENTATIVE #{state.attempt} ⚡</div>
-      </div>
+    <>
+      <Konami />
+      <main className="shell">
+        <TopBar
+          run={state.run}
+          done={state.done}
+          current={state.current}
+          flashLossIdx={flashLossIdx}
+          startTs={timer.startTs}
+          pbMs={pbMs}
+        />
 
-      {/* CONFIG */}
-      <div className="panel">
-        <h2>1. Configuration</h2>
-        <div className="setup-grid">
-          {[0, 1, 2].map((i) => (
-            <div className="field" key={i}>
-              <label>Joueur {i + 1}</label>
-              <input
-                type="text"
-                value={state.players[i] ?? ""}
-                placeholder="Pseudo"
-                onChange={(e) => {
-                  const next = [...state.players];
-                  next[i] = e.target.value;
-                  update({ players: next });
-                }}
-              />
-            </div>
-          ))}
-          <div className="field">
-            <label>Nombre de joueurs</label>
-            <select
-              value={state.playerCount}
-              onChange={(e) => update({ playerCount: parseInt(e.target.value) })}
-            >
-              <option value={2}>2 joueurs</option>
-              <option value={3}>3 joueurs</option>
-            </select>
-          </div>
-        </div>
+        <Hero
+          attempt={state.attempt}
+          difficulty={state.difficulty}
+          inRun={state.run.length > 0}
+        />
 
-        <div className="field" style={{ marginTop: 18 }}>
-          <label>Difficulté</label>
-          <div className="toggle-group">
-            <button
-              className={`toggle ${state.difficulty === "normal" ? "active" : ""}`}
-              onClick={() => update({ difficulty: "normal" as Difficulty })}
-            >
-              🎯 Normal
-            </button>
-            <button
-              className={`toggle hardcore ${state.difficulty === "hardcore" ? "active" : ""}`}
-              onClick={() => update({ difficulty: "hardcore" as Difficulty })}
-            >
-              🔥 Hardcore
-            </button>
-          </div>
-        </div>
+        <ConfigPanel
+          players={state.players}
+          playerCount={state.playerCount}
+          difficulty={state.difficulty}
+          penaltyMode={state.penaltyMode}
+          onPlayersChange={(players) => update({ players })}
+          onPlayerCountChange={(playerCount) => update({ playerCount })}
+          onDifficultyChange={(difficulty) => update({ difficulty })}
+          onPenaltyChange={(penaltyMode) => update({ penaltyMode })}
+        />
 
-        <div className="field" style={{ marginTop: 18 }}>
-          <label>Pénalité en cas de défaite</label>
-          <div className="toggle-group">
-            <button
-              className={`toggle ${state.penaltyMode === "reset" ? "active" : ""}`}
-              onClick={() => update({ penaltyMode: "reset" as PenaltyMode })}
-            >
-              💀 Reset complet (retour jeu 1)
-            </button>
-            <button
-              className={`toggle ${state.penaltyMode === "stepback" ? "active" : ""}`}
-              onClick={() => update({ penaltyMode: "stepback" as PenaltyMode })}
-            >
-              ↩️ Recule d'un jeu
-            </button>
-          </div>
-        </div>
-      </div>
+        <PoolPanel
+          pool={POOL}
+          filteredPool={filteredPool}
+          categories={getCategories()}
+          difficulty={state.difficulty}
+          pinned={state.pinned}
+          filter={state.filter}
+          search={state.search}
+          onFilterChange={(filter) => update({ filter })}
+          onSearchChange={(search) => update({ search })}
+          onTogglePin={togglePin}
+          onGenerate={requestGenerate}
+          onReroll={rerollRun}
+          hasRun={state.run.length > 0}
+        />
 
-      {/* POOL */}
-      <div className="panel">
-        <h2>
-          2. Sélection du pool
-          <span className="badge">{state.pinned.length} / 5 épinglés</span>
-        </h2>
-        <p style={{ color: "var(--muted)", fontSize: 13, marginBottom: 14 }}>
-          Clique pour <strong style={{ color: "var(--gold)" }}>épingler jusqu'à 5 jeux</strong> qui seront forcés dans la run. Les autres sont tirés au sort dans le reste du pool.
-        </p>
+        <RunPanel
+          run={state.run}
+          pool={POOL}
+          done={state.done}
+          current={state.current}
+          pinned={state.pinned}
+          difficulty={state.difficulty}
+          champions={state.champions}
+          drawingFor={drawingFor}
+          drawingDisplay={drawingDisplay}
+          swappedIdx={swappedIdx}
+          onSwap={swapGame}
+          onDraw={drawChampion}
+          onWin={winGame}
+          onLose={loseGame}
+        />
 
-        <div className="pool-controls">
-          <input
-            type="text"
-            className="pool-search"
-            placeholder="🔎 Chercher un jeu..."
-            value={state.search}
-            onChange={(e) => update({ search: e.target.value })}
-          />
-        </div>
-
-        <div className="filter-pills">
-          {getCategories().map((cat) => (
-            <button
-              key={cat}
-              className={`filter-pill ${state.filter === cat ? "active" : ""}`}
-              onClick={() => update({ filter: cat })}
-            >
-              {cat === "all" ? "Toutes" : `${CAT_ICONS[cat] ?? ""} ${cat}`}
-            </button>
-          ))}
-        </div>
-
-        <div className="pool-grid">
-          {filteredPool.map((g) => {
-            const effMode = effectiveMode(g, state.difficulty);
-            const isPinned = state.pinned.includes(g.id);
-            let modeLabel = effMode === "solo" ? "⭐ Solo" : effMode === "duo" ? "👥 Duo" : "👨‍👨‍👦 Team";
-            if (g.soloHardcore && state.difficulty !== "hardcore") modeLabel += " (HC = Solo)";
-
-            return (
-              <div
-                key={g.id}
-                className={`pool-card ${effMode === "solo" ? "solo" : effMode === "duo" ? "duo" : ""} ${isPinned ? "pinned" : ""}`}
-                onClick={() => togglePin(g.id)}
-              >
-                <div className="pool-card-name">
-                  {CAT_ICONS[g.cat] ?? "🎮"} {g.name}
-                </div>
-                <div className="pool-card-meta">{g.cat}</div>
-                <div className="pool-card-mode">{modeLabel}</div>
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="generate-row">
-          <button className="btn btn-large btn-start" onClick={generateRun}>
-            {state.run.length > 0 ? "🎲 Régénérer une nouvelle run" : "🎲 Générer la run (10 jeux)"}
-          </button>
-          <button className="btn btn-large btn-reroll" onClick={rerollRun} disabled={state.run.length === 0}>
-            🔄 Re-roll les jeux aléatoires
+        <div className="btn-row" style={{ justifyContent: "flex-end", marginTop: 16 }}>
+          <button className="btn btn-ghost" onClick={hardReset}>
+            <IconTrash size={14} /> Reset complet
           </button>
         </div>
-      </div>
 
-      {/* RUN */}
-      <div className="panel" id="runPanel">
-        <h2>
-          3. Run en cours
-          {state.run.length > 0 && (
-            <span className="badge">
-              {state.done.length}/{state.run.length}
-            </span>
-          )}
-        </h2>
+        <RulesBlock />
+      </main>
 
-        <div className="progress-wrap">
-          <div className="progress-info">
-            <span>{state.difficulty === "hardcore" ? "🔥 Mode Hardcore" : "🎯 Mode Normal"}</span>
-            <span>
-              {state.done.length} / {state.run.length || 10}
-            </span>
-          </div>
-          <div className="progress-bar">
-            <div
-              className={`progress-fill ${state.difficulty === "hardcore" ? "hardcore" : ""}`}
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-        </div>
+      {pendingRun && (
+        <DownloadWarning
+          games={pendingRunGames}
+          onConfirm={confirmStartRun}
+          onCancel={cancelStartRun}
+        />
+      )}
 
-        {state.run.length === 0 ? (
-          <div className="empty-run">
-            <h3>⚙️ Aucune run générée</h3>
-            <p>
-              Épingle 0 à 5 jeux ci-dessus puis clique sur <strong>Générer la run</strong>.
-            </p>
-          </div>
-        ) : (
-          <div className="games">
-            {state.run.map((gameId, idx) => {
-              const g = POOL.find((x) => x.id === gameId) as Game | undefined;
-              if (!g) return null;
+      {cinematic && (
+        <Cinematic
+          nextIdx={cinematic.idx}
+          nextGameName={cinematic.name}
+          onDone={() => setCinematic(null)}
+        />
+      )}
 
-              const isDone = state.done.includes(gameId);
-              const isCurrent = idx === state.current && !isDone;
-              const isLocked = idx > state.current && !isDone;
-              const effMode = effectiveMode(g, state.difficulty);
-              const isSolo = effMode === "solo" || effMode === "duo";
-              const isPinned = state.pinned.includes(gameId);
-              const objective = state.difficulty === "hardcore" ? g.hardcore : g.normal;
-              const champion = state.champions[gameId];
-              const isDrawing = drawingFor === gameId;
-
-              const classes = [
-                "game",
-                isLocked ? "locked" : "",
-                isCurrent ? "current" : "",
-                isDone ? "done" : "",
-                isPinned ? "pinned-run" : "",
-                swappedIdx === idx ? "swapped" : "",
-              ]
-                .filter(Boolean)
-                .join(" ");
-
-              const modeTagClass = effMode === "solo" ? "solo" : effMode === "duo" ? "duo" : "";
-              const modeTagText =
-                effMode === "solo"
-                  ? `⭐ ${g.cat}`
-                  : effMode === "duo"
-                  ? `👥 ${g.cat}`
-                  : g.cat;
-
-              let championLabel: React.ReactNode = null;
-              if (isSolo) {
-                if (isDrawing) {
-                  championLabel = (
-                    <>
-                      🎲 Tirage en cours... <span className="name">{drawingDisplay}</span>
-                    </>
-                  );
-                } else if (champion) {
-                  championLabel =
-                    effMode === "duo" ? (
-                      <>
-                        🎲 Duo désigné : <span className="name">{champion}</span>
-                      </>
-                    ) : (
-                      <>
-                        🎲 Champion désigné : <span className="name">{champion}</span>
-                      </>
-                    );
-                } else {
-                  championLabel =
-                    effMode === "duo" ? (
-                      <>
-                        🎲 Aucun duo tiré — <em>Tirage au sort requis</em>
-                      </>
-                    ) : (
-                      <>
-                        🎲 Aucun champion tiré — <em>Tirage au sort requis</em>
-                      </>
-                    );
-                }
-              }
-
-              return (
-                <div key={`${gameId}-${idx}`} className={classes}>
-                  <div className="game-num">{String(idx + 1).padStart(2, "0")}</div>
-                  <div className="game-info">
-                    <div className="game-title-row">
-                      <div className="game-title">
-                        {CAT_ICONS[g.cat] ?? "🎮"} {g.name}
-                      </div>
-                      <div className={`game-tag ${modeTagClass}`}>{modeTagText}</div>
-                      {isPinned && <div className="game-tag pinned-tag">📌 Épinglé</div>}
-                    </div>
-                    <div className={`game-objective ${state.difficulty === "hardcore" ? "hc" : ""}`}>
-                      Objectif : <strong>{objective}</strong>
-                    </div>
-                    {isSolo && <div className="game-champion">{championLabel}</div>}
-                  </div>
-                  <div className="game-actions">
-                    {isDone ? (
-                      <div className="check">✓</div>
-                    ) : (
-                      <>
-                        <button
-                          className="btn btn-swap"
-                          onClick={() => swapGame(gameId)}
-                          title="On n'a pas ce jeu / on veut le remplacer"
-                        >
-                          🔄 Swap
-                        </button>
-                        {isSolo && (
-                          <button
-                            className="btn btn-draw"
-                            disabled={!isCurrent}
-                            onClick={() => drawChampion(gameId, effMode as "solo" | "duo")}
-                          >
-                            🎲 Tirer
-                          </button>
-                        )}
-                        <button className="btn btn-win" disabled={!isCurrent} onClick={() => winGame(gameId)}>
-                          ✓ Validé
-                        </button>
-                        <button className="btn btn-lose" disabled={!isCurrent} onClick={() => loseGame(gameId)}>
-                          ✗ Échoué
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* GLOBAL CONTROLS */}
-      <div className="controls">
-        <button className="btn btn-large btn-reset" onClick={hardReset}>
-          🗑️ Reset complet
-        </button>
-      </div>
-
-      {/* RULES */}
-      <div className="rules">
-        <strong>📜 Règles du Gauntlet</strong>
-        <ul>
-          <li>
-            Vous devez réussir l'objectif des <strong>10 jeux dans l'ordre</strong> sans une seule défaite.
-          </li>
-          <li>
-            Si l'objectif d'un jeu n'est pas atteint, deux pénalités au choix dans la config :{" "}
-            <strong>Reset complet</strong> (retour jeu 1) ou <strong>Recule d'un jeu</strong> (retour au jeu précédent).
-          </li>
-          <li>
-            Les jeux marqués <span style={{ color: "var(--gold)", fontWeight: 700 }}>SOLO</span> doivent être réussis par <strong>un seul joueur tiré au sort</strong>.
-          </li>
-          <li>
-            Les jeux marqués <span style={{ color: "var(--accent-2)", fontWeight: 700 }}>DUO</span> doivent être réussis par <strong>2 joueurs tirés au sort</strong>.
-          </li>
-          <li>
-            Mode <strong>Hardcore</strong> : objectifs nettement plus exigeants.
-          </li>
-          <li>Re-roll : reroll les jeux aléatoires tout en conservant les jeux épinglés.</li>
-          <li>Bouton 🔄 Swap par carte : remplace un seul jeu par un autre tiré au sort dans le pool restant.</li>
-          <li>La progression est sauvegardée automatiquement dans ce navigateur.</li>
-        </ul>
-      </div>
-
-      {/* OVERLAYS */}
       {overlay.kind === "win" && (
-        <div className="overlay win">
-          <div className="overlay-content">
-            <h2>🏆 GAUNTLET COMPLETED 🏆</h2>
-            <p>Vous avez vaincu les 10 épreuves sans une seule défaite. Le panthéon vous attend.</p>
-            <button
-              className="btn btn-large btn-win"
-              onClick={() => {
-                setOverlay({ kind: null });
-                fullReset();
-              }}
-            >
-              Recommencer une run
-            </button>
-          </div>
-        </div>
+        <WinOverlay
+          totalMs={overlay.totalMs}
+          attempt={state.attempt}
+          difficulty={state.difficulty}
+          players={state.players.slice(0, state.playerCount).filter(Boolean)}
+          isPB={overlay.isPB}
+          previousBestMs={overlay.previousBestMs}
+          onRestart={() => {
+            setOverlay({ kind: null });
+            fullReset();
+          }}
+        />
       )}
 
       {overlay.kind === "lose" && (
-        <div className="overlay lose">
-          <div className="overlay-content">
-            <h2>💀 GAUNTLET FAILED 💀</h2>
-            <p>{overlay.msg}</p>
-            <button className="btn btn-large btn-lose" onClick={() => setOverlay({ kind: null })}>
-              Repartir au combat
-            </button>
-          </div>
-        </div>
+        <LoseOverlay
+          message={overlay.msg}
+          onClose={() => setOverlay({ kind: null })}
+        />
       )}
-    </div>
+    </>
   );
 }

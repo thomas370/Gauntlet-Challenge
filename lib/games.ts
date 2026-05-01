@@ -1,4 +1,4 @@
-import type { Game } from "./types";
+import type { Game, GameMode, Difficulty } from "./types";
 
 export const POOL: Game[] = [
   // BATTLE ROYALE
@@ -109,4 +109,11 @@ export const POOL: Game[] = [
 
 export function getCategories(): string[] {
   const set = new Set<string>();
-  POOL.forEach((g) => set.add(g.c
+  POOL.forEach((g) => set.add(g.cat));
+  return ["all", ...Array.from(set).sort()];
+}
+
+export function effectiveMode(g: Game, difficulty: Difficulty): GameMode {
+  if (g.soloHardcore && difficulty === "hardcore") return "solo";
+  return g.mode;
+}
