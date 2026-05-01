@@ -20,7 +20,7 @@ export function ConfigPanel({
     <section className="panel">
       <div className="panel-head">
         <div>
-          <div className="panel-num">01 / setup</div>
+          <div className="panel-num">Étape 1</div>
           <h2 className="panel-title">Configuration</h2>
         </div>
         <div className="panel-meta">{playerCount} joueurs · {difficulty}</div>

@@ -26,7 +26,7 @@ export function PoolPanel({
     <section className="panel">
       <div className="panel-head">
         <div>
-          <div className="panel-num">02 / pool</div>
+          <div className="panel-num">Étape 2</div>
           <h2 className="panel-title">Sélection des jeux</h2>
         </div>
         <div className="panel-meta">{pinned.length} / 5 épinglés</div>

@@ -35,7 +35,7 @@ export function TopBar({ run, done, current, flashLossIdx, startTs, pbMs }: Prop
     <div className="topbar">
       <div className="brand">
         <span className="brand-mark" aria-hidden="true" />
-        <div className="brand-text">gauntlet<em>/challenge</em></div>
+        <div className="brand-text">Gauntlet<em> Challenge</em></div>
       </div>
 
       <nav className="chain" aria-label="Progression de la run">
@@ -60,7 +60,7 @@ export function TopBar({ run, done, current, flashLossIdx, startTs, pbMs }: Prop
           {formatTime(elapsed)}
         </div>
         <div className={`timer-sub ${pbMs && elapsed > 0 && elapsed < pbMs ? "pb" : ""}`}>
-          {pbMs ? `pb · ${formatTime(pbMs)}` : "no pb"}
+          {pbMs ? `Record · ${formatTime(pbMs)}` : "Pas de record"}
         </div>
       </div>
     </div>
