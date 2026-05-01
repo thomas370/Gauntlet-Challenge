@@ -1,0 +1,16 @@
+export const CAT_ICONS: Record<string, string> = {
+  "Battle Royale": "🪂",
+  "Party": "🎉",
+  "FPS Compétitif": "🔫",
+  "FPS Coop": "🎯",
+  "Sport": "⚽",
+  "Coop": "🤝",
+  "Horror Coop": "👻",
+  "Sandbox": "⛏️",
+  "Survie": "🌲",
+  "Puzzle": "🧩",
+  "Fighting": "👊",
+  "Racing": "🏎️",
+  "Solo Champion": "⭐",
+  "MOBA": "⚔️",
+};
