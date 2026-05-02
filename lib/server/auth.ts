@@ -6,7 +6,8 @@ import type { NextRequest } from "next/server";
 import { env } from "./env";
 import type { SteamSessionUser } from "@/lib/types/steam";
 
-export const SESSION_COOKIE = "gauntlet_session";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
+export { SESSION_COOKIE };
 const SESSION_TTL_DAYS = 7;
 
 export function signSession(user: SteamSessionUser): string {

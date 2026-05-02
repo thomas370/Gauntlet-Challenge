@@ -34,7 +34,10 @@ interface Room {
   subscribers: Set<Subscriber>;
 }
 
-const rooms = new Map<string, Room>();
+// Persist across Next.js hot-reloads in dev mode.
+const g = global as typeof global & { _rooms?: Map<string, Room> };
+if (!g._rooms) g._rooms = new Map<string, Room>();
+const rooms = g._rooms;
 
 function generateCode(): string {
   let s = "";

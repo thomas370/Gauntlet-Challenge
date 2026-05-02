@@ -2,7 +2,7 @@
 // is locked behind a valid Steam session cookie.
 
 import { NextResponse, type NextRequest } from "next/server";
-import { SESSION_COOKIE } from "@/lib/server/auth";
+import { SESSION_COOKIE } from "@/lib/session-cookie";
 
 const PUBLIC_PATHS = ["/login", "/pair"];
 const PUBLIC_API_PREFIXES = ["/api/auth/"];
@@ -24,6 +24,15 @@ export function middleware(req: NextRequest) {
     url.search = "";
     return NextResponse.redirect(url);
   }
+
+  // Redirect logged-in users away from login/root to lobby.
+  if (pathname === "/" || pathname === "/login") {
+    const url = req.nextUrl.clone();
+    url.pathname = "/lobby";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
   return NextResponse.next();
 }
 
