@@ -106,7 +106,9 @@ export default function Page() {
  const router = useRouter();
  const roomCode = (params.code ?? "").toUpperCase();
  const { state, setState, members, closed } = useRoom(roomCode);
- const hydrated = true; // state is server-sourced; no async hydration needed
+ const hydrated = true;
+ const [localSearch, setLocalSearch] = useState("");
+ const [localFilter, setLocalFilter] = useState("all");
  const [overlay, setOverlay] = useState<{ kind: "win" | "lose" | null; msg?: string }>({ kind: null });
  const [drawingFor, setDrawingFor] = useState<number | null>(null);
  const [slotData, setSlotData] = useState<{
@@ -134,21 +136,6 @@ export default function Page() {
    }
  }, [closed, router]);
 
- // === SYNC PLAYER NAMES + COUNT FROM ROOM MEMBERS ===
- // The members list is the source of truth for who's playing. Keep state.players
- // and state.playerCount derived but persisted so existing gauntlet logic works.
- useEffect(() => {
-   if (members.length === 0) return;
-   const names = members.slice(0, 3).map((m) => m.displayName);
-   while (names.length < 3) names.push("");
-   const desiredCount = Math.min(Math.max(members.length, 2), 3) as 2 | 3;
-   if (
-     names.join("|") === (state.players ?? []).slice(0, 3).join("|") &&
-     state.playerCount === desiredCount
-   ) return;
-   setState((s) => ({ ...s, players: names, playerCount: desiredCount }));
- // eslint-disable-next-line react-hooks/exhaustive-deps
- }, [members]);
 
 
 
@@ -443,33 +430,31 @@ export default function Page() {
  alert("Ce jeu est déjà validé, impossible de le swap.");
  return;
  }
- setState((s) => {
- const idx = s.run.indexOf(gameId);
- if (idx === -1) return s;
- const available = POOL.filter((g) => !s.run.includes(g.id));
+ const idx = state.run.indexOf(gameId);
+ if (idx === -1) return;
+ const available = POOL.filter((g) => !state.run.includes(g.id));
  if (available.length === 0) {
  alert("Plus aucun jeu disponible dans le pool pour swap.");
- return s;
+ return;
  }
  const newGame = available[Math.floor(Math.random() * available.length)];
- const newRun = [...s.run];
+ const newRun = [...state.run];
  newRun[idx] = newGame.id;
- const newPinned = s.pinned.filter((x) => x !== gameId);
- const newChampions = { ...s.champions };
+ const newPinned = state.pinned.filter((x) => x !== gameId);
+ const newChampions = { ...state.champions };
  delete newChampions[gameId];
  setSwappedIdx(idx);
  if (swapTimer.current) clearTimeout(swapTimer.current);
  swapTimer.current = setTimeout(() => setSwappedIdx(null), 700);
- return { ...s, run: newRun, pinned: newPinned, champions: newChampions };
- });
+ setState((s) => ({ ...s, run: newRun, pinned: newPinned, champions: newChampions }));
  playClick();
  };
 
  // === SLOT MACHINE DRAW ===
  const drawChampion = (gameId: number, mode: "solo" | "duo") => {
- const players = state.players.slice(0, state.playerCount).filter((p) => p && p.trim());
+ const players = members.map((m) => m.displayName).filter((p) => p && p.trim());
  if (players.length === 0) {
- alert("Saisis au moins le pseudo de tes joueurs en haut de la page !");
+ alert("Aucun joueur dans la room !");
  return;
  }
  if (mode === "duo" && players.length < 2) {
@@ -721,8 +706,8 @@ export default function Page() {
  // === DERIVED ===
  const filteredPool = POOL.filter(
  (g) =>
- (state.filter === "all" || g.cat === state.filter) &&
- (!state.search || g.name.toLowerCase().includes(state.search.toLowerCase()))
+ (localFilter === "all" || g.cat === localFilter) &&
+ (!localSearch || g.name.toLowerCase().includes(localSearch.toLowerCase()))
  );
  const progressPct = state.run.length === 0 ? 0 : (state.done.length / state.run.length) * 100;
 
@@ -746,19 +731,6 @@ export default function Page() {
  <div id="bgParticles"ref={particlesRef}></div>
  {/* Confetti canvas */}
  <canvas id="confettiCanvas"ref={confettiRef}></canvas>
- {/* Sound toggle */}
- <button
- className={`sound-toggle ${state.soundEnabled ? "" : "muted"}`}
- title={state.soundEnabled ? "Couper le son" : "Activer le son"}
- onClick={() => {
- update({ soundEnabled: !state.soundEnabled });
- if (!state.soundEnabled) {
- initAudio();
- }
- }}
- >
- {state.soundEnabled ? <Icon name="volume" /> : <Icon name="volumeOff" />}
- </button>
 
  <div className="container">
  {/* ROOM BANNER */}
@@ -792,7 +764,7 @@ export default function Page() {
             </span>
             <span className="hero-meta-pill">
               <span className="dot"></span>
-              {state.playerCount} joueurs
+              {members.length || 1} joueur{members.length > 1 ? "s" : ""}
             </span>
             {state.runStartTime && state.run.length > 0 && (
               <span className="hero-meta-pill timer">
@@ -876,16 +848,16 @@ export default function Page() {
  type="text"
  className="pool-search"
  placeholder="Chercher un jeu..."
- value={state.search}
- onChange={(e) => update({ search: e.target.value })}
+ value={localSearch}
+ onChange={(e) => setLocalSearch(e.target.value)}
  />
  </div>
  <div className="filter-pills">
  {getCategories().map((cat) => (
  <button
  key={cat}
- className={`filter-pill ${state.filter === cat ? "active" : ""}`}
- onClick={() => update({ filter: cat })}
+ className={`filter-pill ${localFilter === cat ? "active" : ""}`}
+ onClick={() => setLocalFilter(cat)}
  >
  {cat === "all" ? "Toutes" : `${CAT_ICONS[cat] ?? ""} ${cat}`}
  </button>
@@ -962,12 +934,6 @@ export default function Page() {
  <div className="progress-info">
  <span>{state.difficulty === "hardcore" ? "Mode Hardcore" : "Mode Normal"}</span>
  <span>{state.done.length} / {totalSegs}</span>
- </div>
- <div className="progress-bar">
- <div
- className={`progress-fill ${state.difficulty === "hardcore" ? "hardcore" : ""}`}
- style={{ width: `${progressPct}%` }}
- />
  </div>
  <div className={`seg-progress ${state.difficulty === "hardcore" ? "hardcore" : ""}`}>
  {Array.from({ length: totalSegs }).map((_, i) => {
