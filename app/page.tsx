@@ -725,20 +725,6 @@ export default function Page() {
  <div id="bgParticles"ref={particlesRef}></div>
  {/* Confetti canvas */}
  <canvas id="confettiCanvas"ref={confettiRef}></canvas>
- {/* Sound toggle */}
- <button
- className={`sound-toggle ${state.soundEnabled ? "" : "muted"}`}
- title={state.soundEnabled ? "Couper le son" : "Activer le son"}
- onClick={() => {
- update({ soundEnabled: !state.soundEnabled });
- if (!state.soundEnabled) {
- initAudio();
- }
- }}
- >
- {state.soundEnabled ? <Icon name="volume" /> : <Icon name="volumeOff" />}
- </button>
-
  <div className="container">
  {/* HERO */}
  <div className="hero">
@@ -935,12 +921,6 @@ export default function Page() {
  <div className="progress-info">
  <span>{state.difficulty === "hardcore" ? "Mode Hardcore" : "Mode Normal"}</span>
  <span>{state.done.length} / {totalSegs}</span>
- </div>
- <div className="progress-bar">
- <div
- className={`progress-fill ${state.difficulty === "hardcore" ? "hardcore" : ""}`}
- style={{ width: `${progressPct}%` }}
- />
  </div>
  <div className={`seg-progress ${state.difficulty === "hardcore" ? "hardcore" : ""}`}>
  {Array.from({ length: totalSegs }).map((_, i) => {
