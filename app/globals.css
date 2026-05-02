@@ -406,32 +406,48 @@ html, body {
 .seg-progress {
   display: grid;
   grid-template-columns: repeat(10, 1fr);
-  gap: 3px;
+  gap: 4px;
   margin-top: 6px;
 }
 .seg {
-  height: 4px;
+  height: 8px;
   background: var(--bg-0);
   border: 1px solid var(--line);
-  border-radius: 1px;
-  transition: all 0.2s ease;
+  border-radius: 3px;
+  transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
 }
 .seg.done {
-  background: var(--accent);
+  background: linear-gradient(90deg, #6dbe85 0%, #6cb5d4 100%);
   border-color: var(--accent);
-  box-shadow: none;
+  box-shadow: 0 0 8px rgba(108, 181, 212, 0.55);
 }
 .seg.current {
+  background: rgba(108, 181, 212, 0.15);
   border-color: var(--accent);
-  animation: none;
+  box-shadow: 0 0 6px rgba(108, 181, 212, 0.35);
+  animation: seg-pulse 1.4s ease-in-out infinite;
 }
 .seg.current::after { display: none; }
+@keyframes seg-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(108, 181, 212, 0.3); }
+  50%      { box-shadow: 0 0 12px rgba(108, 181, 212, 0.7); }
+}
 .seg-progress.hardcore .seg.done {
-  background: var(--danger);
+  background: linear-gradient(90deg, #e0a850 0%, #d96b6b 100%);
   border-color: var(--danger);
-  box-shadow: none;
+  box-shadow: 0 0 8px rgba(217, 107, 107, 0.55);
+}
+.seg-progress.hardcore .seg.current {
+  background: rgba(217, 107, 107, 0.15);
+  border-color: var(--danger);
+  box-shadow: 0 0 6px rgba(217, 107, 107, 0.4);
+  animation: seg-pulse-hc 1.4s ease-in-out infinite;
+}
+@keyframes seg-pulse-hc {
+  0%, 100% { box-shadow: 0 0 4px rgba(217, 107, 107, 0.3); }
+  50%      { box-shadow: 0 0 12px rgba(217, 107, 107, 0.75); }
 }
 
 
