@@ -1,10 +1,15 @@
 // Client-side hook that mirrors a useState<GauntletState> API while keeping the
 // room state in sync with the server via Server-Sent Events.
 //
-// The signature of `setState` matches React's setState dispatcher exactly, so the
-// existing gauntlet code can call setState((s) => ...) or setState(value) without
-// changes. Each call applies optimistically locally AND POSTs the new state to
-// the server, which broadcasts it back to every other subscriber.
+// Each setState call:
+//   1. Applies the change locally (instant, optimistic)
+//   2. POSTs the new state to the server, which broadcasts it to every subscriber
+//
+// Design notes:
+// - stateRef holds the *synchronous* latest state so consecutive setState calls
+//   always compute from the most recent value, not a stale React closure.
+// - fetch is called OUTSIDE the React updater function (React can call updaters
+//   more than once in Strict Mode / concurrent mode — side effects must not live there).
 
 "use client";
 
@@ -26,8 +31,11 @@ export function useRoom(code: string): UseRoomResult {
   const [connected, setConnected] = useState(false);
   const [closed, setClosed] = useState<string | null>(null);
 
-  // Holds the most recent state to push when batching mutations. Currently we send
-  // each mutation immediately, but a ref leaves room for a debounce later.
+  // Synchronous mirror of the React state — lets consecutive setState calls
+  // each read the freshest value without waiting for a re-render.
+  const stateRef = useRef<GauntletState>(DEFAULT_STATE);
+  // Tracks what we last pushed to the server so we don't re-broadcast our
+  // own SSE echo back.
   const lastSent = useRef<GauntletState | null>(null);
 
   useEffect(() => {
@@ -38,6 +46,7 @@ export function useRoom(code: string): UseRoomResult {
       try {
         const event = JSON.parse(raw.data) as RoomEvent;
         if (event.type === "state") {
+          stateRef.current = event.state;
           setLocalState(event.state);
         } else if (event.type === "members") {
           setMembers(event.members);
@@ -63,22 +72,30 @@ export function useRoom(code: string): UseRoomResult {
 
   const setState = useCallback<React.Dispatch<React.SetStateAction<GauntletState>>>(
     (value) => {
-      setLocalState((prev) => {
-        const next =
-          typeof value === "function"
-            ? (value as (s: GauntletState) => GauntletState)(prev)
-            : value;
-        // Avoid re-broadcasting unchanged state (cheap reference check first).
-        if (next !== prev && next !== lastSent.current) {
-          lastSent.current = next;
-          fetch(`/api/room/${code}/mutate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ state: next }),
-          }).catch(() => {});
-        }
-        return next;
-      });
+      // Compute next state synchronously — no stale closures.
+      const prev = stateRef.current;
+      const next =
+        typeof value === "function"
+          ? (value as (s: GauntletState) => GauntletState)(prev)
+          : value;
+
+      if (next === prev) return; // pure no-op — skip everything
+
+      // 1. Apply locally (optimistic)
+      stateRef.current = next;
+      setLocalState(next);
+
+      // 2. Broadcast to server (skip if this is an echo of what we just sent)
+      if (next !== lastSent.current) {
+        lastSent.current = next;
+        fetch(`/api/room/${code}/mutate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: next }),
+        }).catch((err) => {
+          console.warn("[room] mutate failed:", err);
+        });
+      }
     },
     [code],
   );

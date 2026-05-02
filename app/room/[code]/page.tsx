@@ -14,6 +14,7 @@ import {
  type RunHistoryEntry,
 } from "@/lib/types";
 import { useRoom } from "@/lib/client/use-room";
+import { useMe } from "@/lib/client/use-me";
 
 // === ICONS (Lucide-style inline SVG) ===
 const ICON_PATHS: Record<string, React.ReactNode> = {
@@ -105,7 +106,8 @@ export default function Page() {
  const params = useParams<{ code: string }>();
  const router = useRouter();
  const roomCode = (params.code ?? "").toUpperCase();
- const { state, setState, members, closed } = useRoom(roomCode);
+ const { state, setState, members, connected, closed } = useRoom(roomCode);
+ const me = useMe();
  const hydrated = true;
  const [localSearch, setLocalSearch] = useState("");
  const [localFilter, setLocalFilter] = useState("all");
@@ -785,6 +787,8 @@ export default function Page() {
  (!localSearch || g.name.toLowerCase().includes(localSearch.toLowerCase()))
  );
  const progressPct = state.run.length === 0 ? 0 : (state.done.length / state.run.length) * 100;
+ // Lock config once a run is active (run generated + countdown done)
+ const runLocked = state.run.length > 0;
 
  if (!hydrated) {
  return (
@@ -815,6 +819,10 @@ export default function Page() {
      <span className="room-banner-label">Room</span>
      <span className="room-banner-code">{roomCode}</span>
      <span className="room-banner-members">{members.length} joueur{members.length > 1 ? "s" : ""}</span>
+     <span className={`room-sync-status ${connected ? "ok" : "lost"}`} title={connected ? "Sync en temps réel active" : "Connexion perdue — les actions ne se synchronisent pas"}>
+       <span className="room-sync-dot"></span>
+       {connected ? "Sync" : "Hors-ligne"}
+     </span>
    </div>
    <div className="room-banner-actions">
      <button className="room-banner-btn" onClick={copyRoomLink} title="Copier le lien d'invitation">Inviter</button>
@@ -853,7 +861,10 @@ export default function Page() {
 
  {/* CONFIG */}
  <div className="panel">
- <h2><span className="panel-title"><span className="panel-section-num">1</span> Configuration</span></h2>
+ <h2>
+   <span className="panel-title"><span className="panel-section-num">1</span> Configuration</span>
+   {runLocked && <span className="config-locked-badge">🔒 Verrouillé — run en cours</span>}
+ </h2>
  <div className="setup-grid">
  {[0, 1, 2].map((i) => {
  const member = members[i];
@@ -881,12 +892,14 @@ export default function Page() {
  <button
  className={`toggle ${state.difficulty === "normal" ? "active" : ""}`}
  onClick={() => update({ difficulty: "normal"as Difficulty })}
+ disabled={runLocked}
  >
  Normal
  </button>
  <button
  className={`toggle hardcore ${state.difficulty === "hardcore" ? "active" : ""}`}
  onClick={() => update({ difficulty: "hardcore"as Difficulty })}
+ disabled={runLocked}
  >
  Hardcore
  </button>
@@ -899,12 +912,14 @@ export default function Page() {
  <button
  className={`toggle ${state.penaltyMode === "reset" ? "active" : ""}`}
  onClick={() => update({ penaltyMode: "reset"as PenaltyMode })}
+ disabled={runLocked}
  >
  Reset complet (retour jeu 1)
  </button>
  <button
  className={`toggle ${state.penaltyMode === "stepback" ? "active" : ""}`}
  onClick={() => update({ penaltyMode: "stepback"as PenaltyMode })}
+ disabled={runLocked}
  >
  Recule d&apos;un jeu
  </button>
@@ -917,12 +932,14 @@ export default function Page() {
  <button
    className={`toggle ${state.powerUpsEnabled !== false ? "active" : ""}`}
    onClick={() => update({ powerUpsEnabled: true })}
+   disabled={runLocked}
  >
    Activés
  </button>
  <button
    className={`toggle ${state.powerUpsEnabled === false ? "active" : ""}`}
    onClick={() => update({ powerUpsEnabled: false })}
+   disabled={runLocked}
  >
    Désactivés
  </button>
@@ -1280,6 +1297,7 @@ export default function Page() {
        const runActive = state.run.length > 0;
        const currentGameId = state.run[state.current];
        const canReroll = runActive && !!currentGameId && !!state.champions[currentGameId] && !state.done.includes(currentGameId);
+       const isMe = me?.steamId === member.steamId;
        return (
          <div className="powerup-card" key={member.steamId}>
            <div className="powerup-player">
@@ -1289,25 +1307,25 @@ export default function Page() {
            <div className="powerup-buttons">
              <button
                className={`powerup-btn joker${pu.joker <= 0 ? " used" : ""}`}
-               disabled={pu.joker <= 0 || !runActive}
+               disabled={!isMe || pu.joker <= 0 || !runActive}
                onClick={() => useJoker(member.steamId)}
-               title="Joker : échange un jeu aléatoire non validé de la run"
+               title={isMe ? "Joker : échange un jeu aléatoire non validé de la run" : "Ce bonus appartient à un autre joueur"}
              >
                🃏 Joker <span className="powerup-count">×{pu.joker}</span>
              </button>
              <button
                className={`powerup-btn shield${pu.shield <= 0 || state.shieldActive === true ? " used" : ""}`}
-               disabled={pu.shield <= 0 || state.shieldActive === true}
+               disabled={!isMe || pu.shield <= 0 || state.shieldActive === true}
                onClick={() => useShield(member.steamId)}
-               title="Bouclier : annule la prochaine défaite"
+               title={isMe ? "Bouclier : annule la prochaine défaite" : "Ce bonus appartient à un autre joueur"}
              >
                🛡️ Bouclier <span className="powerup-count">×{pu.shield}</span>
              </button>
              <button
                className={`powerup-btn reroll${pu.reroll <= 0 || !canReroll ? " used" : ""}`}
-               disabled={pu.reroll <= 0 || !canReroll}
+               disabled={!isMe || pu.reroll <= 0 || !canReroll}
                onClick={() => useReroll(member.steamId)}
-               title="Relance : retire le champion au sort"
+               title={isMe ? "Relance : retire le champion au sort" : "Ce bonus appartient à un autre joueur"}
              >
                🎲 Relance <span className="powerup-count">×{pu.reroll}</span>
              </button>

@@ -29,7 +29,16 @@ export async function GET(
   // Implicit join — opening the stream means the user is in the room. This makes
   // the SSE connection itself the join signal, so refreshing the page Just Works.
   const joined = joinRoom(params.code, user);
-  if ("error" in joined) return new Response(joined.error, { status: 404 });
+  if ("error" in joined) {
+    // Send a proper SSE `closed` event so the client hook picks it up and
+    // redirects to the lobby, instead of a bare 404 that EventSource retries forever.
+    const enc = new TextEncoder();
+    const msg = `event: closed\ndata: ${JSON.stringify({ type: "closed", reason: joined.error })}\n\n`;
+    return new Response(
+      new ReadableStream({ start(c) { c.enqueue(enc.encode(msg)); c.close(); } }),
+      { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } },
+    );
+  }
 
   const encoder = new TextEncoder();
   let unsub: (() => void) | null = null;
