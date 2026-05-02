@@ -12,8 +12,6 @@ export const POOL: Game[] = [
  { id: 8, name: "Stumble Guys", cat: "Party", mode: "team", soloHardcore: true, normal: "Au moins 1 joueur dans le Top 5", hardcore: "Joueur tiré au sort GAGNE la partie", appid: 1677740 },
  { id: 9, name: "Crab Game", cat: "Party", mode: "team", soloHardcore: true, normal: "Au moins 1 joueur survit à la saison", hardcore: "Joueur tiré au sort GAGNE la saison", appid: 1782210 },
  { id: 10, name: "Geoguessr Battle Royale", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré au sort gagne 1 partie", hardcore: "Joueur tiré au sort gagne 3 parties d'affilée", cover: "/covers/geoguessr-battle-royale.jpg" },
- { id: 11, name: "MiniRoyale", cat: "Battle Royale", mode: "team", normal: "Top 10 en trio", hardcore: "Win en trio", appid: 1657090 },
- { id: 12, name: "SUPERVIVE", cat: "Battle Royale", mode: "team", normal: "Top 10 en trio", hardcore: "Win en trio", appid: 1283700 },
 
  // FPS
  { id: 13, name: "Counter-Strike 2", cat: "FPS Compétitif", mode: "duo", normal: "2 joueurs tirés gagnent un match Wingman", hardcore: "2 joueurs tirés gagnent 2 Wingman d'affilée", appid: 730 },
