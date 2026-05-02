@@ -33,6 +33,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   users: (<><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>),
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>),
   list: (<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>),
+  info: (<><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>),
 };
 function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number; fill?: string }) {
   const path = ICON_PATHS[name];
@@ -46,9 +47,10 @@ function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number;
   );
 }
 
-// === GAME COVER (Steam library art) ===
-function GameCover({ appid, name, size = "md" }: { appid?: number; name: string; size?: "sm" | "md" | "lg" }) {
-  if (!appid) {
+// === GAME COVER (Steam library art or custom URL) ===
+function GameCover({ appid, cover, name, size = "md" }: { appid?: number; cover?: string; name: string; size?: "sm" | "md" | "lg" }) {
+  const src = cover ?? (appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg` : null);
+  if (!src) {
     return (
       <div className={`game-cover game-cover-${size} game-cover-fallback`}>
         <span>{name.slice(0, 2).toUpperCase()}</span>
@@ -58,7 +60,7 @@ function GameCover({ appid, name, size = "md" }: { appid?: number; name: string;
   return (
     <div className={`game-cover game-cover-${size}`}>
       <img
-        src={`https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`}
+        src={src}
         alt={name}
         loading="lazy"
         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
@@ -113,6 +115,7 @@ export default function Page() {
  const [reviewing, setReviewing] = useState(false);
  const [countdown, setCountdown] = useState<number | null>(null);
  const [now, setNow] = useState<number>(Date.now());
+ const [objTip, setObjTip] = useState<{ id: number; right: number; top: number; bottom: number; flipUp: boolean } | null>(null);
  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
  const audioCtxRef = useRef<AudioContext | null>(null);
  const confettiRef = useRef<HTMLCanvasElement | null>(null);
@@ -880,12 +883,32 @@ export default function Page() {
  onClick={() => togglePin(g.id)}
  >
  <span className="pool-card-pin"><Icon name="pin" size={12} /></span>
-                  <GameCover appid={g.appid} name={g.name} size="sm" />
+                  <GameCover appid={g.appid} cover={g.cover} name={g.name} size="sm" />
                   <div className="pool-card-info">
                     <div className="pool-card-name">{g.name}</div>
                     <div className="pool-card-meta">{g.cat}</div>
                     <div className="pool-card-mode">{effMode === "solo" ? <Icon name="star" size={11} /> : effMode === "duo" ? <Icon name="user" size={11} /> : <Icon name="users" size={11} />} {modeLabel}</div>
                   </div>
+                  <button
+                    type="button"
+                    className="pool-card-objectives-btn"
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseEnter={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      const flipUp = r.bottom + 120 > window.innerHeight;
+                      setObjTip({ id: g.id, right: window.innerWidth - r.right, top: r.bottom, bottom: window.innerHeight - r.top, flipUp });
+                    }}
+                    onMouseLeave={() => setObjTip((t) => (t && t.id === g.id ? null : t))}
+                    onFocus={(e) => {
+                      const r = e.currentTarget.getBoundingClientRect();
+                      const flipUp = r.bottom + 120 > window.innerHeight;
+                      setObjTip({ id: g.id, right: window.innerWidth - r.right, top: r.bottom, bottom: window.innerHeight - r.top, flipUp });
+                    }}
+                    onBlur={() => setObjTip((t) => (t && t.id === g.id ? null : t))}
+                    aria-label="Voir les objectifs"
+                  >
+                    <Icon name="info" size={14} />
+                  </button>
  </div>
  );
  })}
@@ -970,7 +993,7 @@ export default function Page() {
  return (
  <div key={`${gameId}-${idx}`} className={classes}>
  <div className="game-num">{String(idx + 1).padStart(2, "0")}</div>
- <GameCover appid={g.appid} name={g.name} size="md" />
+ <GameCover appid={g.appid} cover={g.cover} name={g.name} size="md" />
  <div className="game-info">
  <div className="game-title-row">
  <div className="game-title">
@@ -1206,7 +1229,7 @@ export default function Page() {
  return (
  <div className="review-item" key={`${id}-${idx}`}>
  <div className="review-num">{String(idx + 1).padStart(2, "0")}</div>
- <GameCover appid={g.appid} name={g.name} size="sm" />
+ <GameCover appid={g.appid} cover={g.cover} name={g.name} size="sm" />
  <div className="review-info">
  <div className="review-name">{g.name}</div>
  <div className="review-meta">
@@ -1244,6 +1267,21 @@ export default function Page() {
  </div>
  </div>
  )}
+
+ {/* === FLOATING OBJECTIVES TOOLTIP === */}
+ {objTip !== null && (() => {
+   const game = POOL.find((x) => x.id === objTip.id);
+   if (!game) return null;
+   const style: React.CSSProperties = objTip.flipUp
+     ? { bottom: objTip.bottom + 6, right: objTip.right }
+     : { top: objTip.top + 6, right: objTip.right };
+   return (
+     <div className="floating-objectives-tooltip" style={style}>
+       <div className="tt-row"><span className="tt-label tt-normal">Normal</span><span className="tt-text">{game.normal}</span></div>
+       <div className="tt-row"><span className="tt-label tt-hardcore">Hardcore</span><span className="tt-text">{game.hardcore}</span></div>
+     </div>
+   );
+ })()}
  </div>
  </>
  );

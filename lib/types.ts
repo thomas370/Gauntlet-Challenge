@@ -11,6 +11,8 @@ export interface Game {
   soloHardcore?: boolean;
   /** Steam App ID for cover art. Leave undefined for non-Steam games. */
   appid?: number;
+  /** Custom cover URL (overrides appid). Used for non-Steam games. */
+  cover?: string;
 }
 
 export type Difficulty = "normal" | "hardcore";
