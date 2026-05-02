@@ -46,6 +46,27 @@ function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number;
   );
 }
 
+// === GAME COVER (Steam library art) ===
+function GameCover({ appid, name, size = "md" }: { appid?: number; name: string; size?: "sm" | "md" | "lg" }) {
+  if (!appid) {
+    return (
+      <div className={`game-cover game-cover-${size} game-cover-fallback`}>
+        <span>{name.slice(0, 2).toUpperCase()}</span>
+      </div>
+    );
+  }
+  return (
+    <div className={`game-cover game-cover-${size}`}>
+      <img
+        src={`https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`}
+        alt={name}
+        loading="lazy"
+        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+      />
+    </div>
+  );
+}
+
 const STORAGE_KEY = "gauntlet_v3";
 
 function shuffle<T>(arr: T[]): T[] {
@@ -859,11 +880,12 @@ export default function Page() {
  onClick={() => togglePin(g.id)}
  >
  <span className="pool-card-pin"><Icon name="pin" size={12} /></span>
-                  <div className="pool-card-name">
- {CAT_ICONS[g.cat] ?? ""} {g.name}
- </div>
- <div className="pool-card-meta">{g.cat}</div>
- <div className="pool-card-mode">{effMode === "solo" ? <Icon name="star" size={11} /> : effMode === "duo" ? <Icon name="user" size={11} /> : <Icon name="users" size={11} />} {modeLabel}</div>
+                  <GameCover appid={g.appid} name={g.name} size="sm" />
+                  <div className="pool-card-info">
+                    <div className="pool-card-name">{g.name}</div>
+                    <div className="pool-card-meta">{g.cat}</div>
+                    <div className="pool-card-mode">{effMode === "solo" ? <Icon name="star" size={11} /> : effMode === "duo" ? <Icon name="user" size={11} /> : <Icon name="users" size={11} />} {modeLabel}</div>
+                  </div>
  </div>
  );
  })}
@@ -948,6 +970,7 @@ export default function Page() {
  return (
  <div key={`${gameId}-${idx}`} className={classes}>
  <div className="game-num">{String(idx + 1).padStart(2, "0")}</div>
+ <GameCover appid={g.appid} name={g.name} size="md" />
  <div className="game-info">
  <div className="game-title-row">
  <div className="game-title">
@@ -1183,6 +1206,7 @@ export default function Page() {
  return (
  <div className="review-item" key={`${id}-${idx}`}>
  <div className="review-num">{String(idx + 1).padStart(2, "0")}</div>
+ <GameCover appid={g.appid} name={g.name} size="sm" />
  <div className="review-info">
  <div className="review-name">{g.name}</div>
  <div className="review-meta">

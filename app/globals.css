@@ -1092,3 +1092,94 @@ body.shake { animation: none; }
   60% { transform: scale(1); opacity: 1; }
   100% { transform: scale(0.95); opacity: 0.7; }
 }
+
+
+/* ====== GAME COVER (Steam jacket) ====== */
+.game-cover {
+  flex-shrink: 0;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.game-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.game-cover-sm { width: 36px; height: 54px; }
+.game-cover-md { width: 50px; height: 72px; }
+.game-cover-lg { width: 90px; height: 130px; }
+.game-cover-fallback {
+  background: linear-gradient(135deg, var(--bg-2), var(--bg-0));
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.game-cover-fallback.game-cover-md { font-size: 13px; }
+.game-cover-fallback.game-cover-lg { font-size: 18px; }
+
+/* Adjust run card grid to make room for cover */
+.game {
+  grid-template-columns: 36px 50px 1fr auto !important;
+  gap: 14px;
+}
+
+/* Adjust review modal item grid */
+.review-item {
+  grid-template-columns: 30px 36px 1fr auto auto !important;
+}
+
+@media (max-width: 600px) {
+  .game { grid-template-columns: 28px 40px 1fr !important; }
+  .game-actions { grid-column: 1 / -1; }
+  .game-cover-md { width: 40px; height: 58px; }
+}
+
+
+/* ====== POOL CARD with cover (horizontal layout) ====== */
+.pool-card {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: 10px;
+  align-items: stretch;
+}
+.pool-card .pool-card-pin {
+  position: absolute;
+  top: 4px; right: 6px;
+  z-index: 2;
+}
+.pool-card-info {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+.pool-card-info .pool-card-name {
+  padding-right: 18px;
+  font-size: 12px;
+  margin-bottom: 0;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pool-card-info .pool-card-meta {
+  font-size: 10px;
+}
+.pool-card-info .pool-card-mode {
+  margin-top: 3px;
+  align-self: flex-start;
+}
+.pool-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}

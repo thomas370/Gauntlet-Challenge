@@ -9,6 +9,8 @@ export interface Game {
   hardcore: string;
   /** If true, this game becomes solo-mode only when difficulty === 'hardcore'. */
   soloHardcore?: boolean;
+  /** Steam App ID for cover art. Leave undefined for non-Steam games. */
+  appid?: number;
 }
 
 export type Difficulty = "normal" | "hardcore";
