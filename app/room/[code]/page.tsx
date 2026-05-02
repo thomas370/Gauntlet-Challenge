@@ -938,8 +938,8 @@ export default function Page() {
  <div className={`seg-progress ${state.difficulty === "hardcore" ? "hardcore" : ""}`}>
  {Array.from({ length: totalSegs }).map((_, i) => {
  let cls = "seg";
- if (i < state.done.length) cls += "done";
- else if (i === state.current && state.run.length > 0) cls += "current";
+ if (i < state.done.length) cls += " done";
+ else if (i === state.current && state.run.length > 0) cls += " current";
  return <div key={i} className={cls}></div>;
  })}
  </div>
