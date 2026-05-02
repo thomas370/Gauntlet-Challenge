@@ -1,0 +1,82 @@
+// Calls to api.steampowered.com — GetOwnedGames + GetPlayerSummaries.
+// Handles 10s timeout, retries 429s up to 3x with exponential backoff.
+
+import { env } from "./env";
+import { cache } from "./cache";
+import { HttpError } from "./auth";
+import type {
+  GetOwnedGamesResponse,
+  GetPlayerSummariesResponse,
+  SteamPlayerSummary,
+  SteamOwnedGame,
+} from "@/lib/types/steam";
+
+const API_BASE = "https://api.steampowered.com";
+const TIMEOUT_MS = 10_000;
+const MAX_RETRIES = 3;
+
+async function steamFetch(url: string, attempt = 0): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (res.status === 429 && attempt < MAX_RETRIES) {
+      const retryAfter = Number(res.headers.get("retry-after")) * 1000 || 2000 * (attempt + 1);
+      await new Promise((r) => setTimeout(r, retryAfter));
+      return steamFetch(url, attempt + 1);
+    }
+    return res;
+  } catch (e) {
+    if ((e as Error).name === "AbortError") {
+      throw new HttpError(502, "Steam API timeout");
+    }
+    throw new HttpError(502, "Steam API unreachable");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Returns the player summary or null if Steam returned no entry for that ID. */
+export async function getPlayerSummary(steamId: string): Promise<SteamPlayerSummary | null> {
+  const cacheKey = `summary:${steamId}`;
+  const cached = cache.get<SteamPlayerSummary | null>(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const url = `${API_BASE}/ISteamUser/GetPlayerSummaries/v2/?key=${env.STEAM_API_KEY}&steamids=${steamId}`;
+  const res = await steamFetch(url);
+  if (res.status === 401 || res.status === 403) {
+    throw new HttpError(403, "Steam API key invalid");
+  }
+  if (!res.ok) throw new HttpError(502, `Steam API error ${res.status}`);
+  const data = (await res.json()) as GetPlayerSummariesResponse;
+  const summary = data.response.players?.[0] ?? null;
+  cache.set(cacheKey, summary, 300); // 5 min — matches the visibility cache requirement
+  return summary;
+}
+
+/**
+ * GetOwnedGames. Returns the games array (empty if profile is private).
+ * `appIdsFilter` narrows the response server-side; if omitted, returns the full library.
+ */
+export async function getOwnedGames(
+  steamId: string,
+  appIdsFilter?: number[],
+): Promise<SteamOwnedGame[]> {
+  const params = new URLSearchParams({
+    key: env.STEAM_API_KEY,
+    steamid: steamId,
+    include_appinfo: "true",
+    include_played_free_games: "true",
+  });
+  if (appIdsFilter && appIdsFilter.length > 0) {
+    appIdsFilter.forEach((id, i) => params.set(`appids_filter[${i}]`, String(id)));
+  }
+  const url = `${API_BASE}/IPlayerService/GetOwnedGames/v1/?${params.toString()}`;
+  const res = await steamFetch(url);
+  if (res.status === 401 || res.status === 403) {
+    throw new HttpError(403, "Steam API key invalid");
+  }
+  if (!res.ok) throw new HttpError(502, `Steam API error ${res.status}`);
+  const data = (await res.json()) as GetOwnedGamesResponse;
+  return data.response.games ?? [];
+}

@@ -9,11 +9,15 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.7.2",
+    "jsonwebtoken": "^9.0.3",
     "next": "14.2.15",
+    "node-cache": "^5.1.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

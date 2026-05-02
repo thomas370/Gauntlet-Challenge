@@ -33,6 +33,13 @@ export interface RunHistoryEntry {
   total: number;
 }
 
+export interface SteamLink {
+  steamId: string;
+  displayName: string;
+  avatarUrl: string;
+  profileUrl: string;
+}
+
 export interface GauntletState {
   attempt: number;
   current: number;
@@ -51,6 +58,8 @@ export interface GauntletState {
   runStartTime: number | null;
   runFails: Record<number, number>;
   history: RunHistoryEntry[];
+  /** Per-slot Steam account binding (key = slot index 0..2). */
+  steamLinks: Record<number, SteamLink>;
 }
 
 export const DEFAULT_STATE: GauntletState = {
@@ -71,4 +80,5 @@ export const DEFAULT_STATE: GauntletState = {
   runStartTime: null,
   runFails: {},
   history: [],
+  steamLinks: {},
 };
