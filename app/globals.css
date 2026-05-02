@@ -23,7 +23,7 @@ html, body {
   font-weight: 400;
   min-height: 100vh;
   line-height: 1.55;
-  overflow-x: hidden;
+  overflow-x: clip; /* clip without creating a scroll container — preserves position:sticky */
   font-size: 14px;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -1727,4 +1727,176 @@ body.shake { animation: none; }
 }
 .pool-grid {
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+/* ====== ROOM LAYOUT (main + sticky sidebar) ====== */
+.room-layout {
+  max-width: 1380px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.room-main {
+  flex: 1;
+  min-width: 0;
+}
+.room-sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start; /* required for sticky inside flex */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  z-index: 10;
+}
+.room-sidebar::-webkit-scrollbar { width: 4px; }
+.room-sidebar::-webkit-scrollbar-track { background: transparent; }
+.room-sidebar::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+
+/* ====== POWER-UPS PANEL ====== */
+.powerups-panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.powerups-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  font-weight: 700;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.powerups-empty {
+  font-size: 11px;
+  color: var(--muted);
+  font-style: italic;
+}
+.powerup-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.powerup-card:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.powerup-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.powerup-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.powerup-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.powerup-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.powerup-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  text-align: left;
+}
+.powerup-btn.joker:not(.used):not(:disabled) {
+  border-color: rgba(224, 168, 80, 0.5);
+  color: var(--warn);
+}
+.powerup-btn.joker:not(.used):hover:not(:disabled) {
+  background: rgba(224, 168, 80, 0.1);
+  border-color: var(--warn);
+}
+.powerup-btn.shield:not(.used):not(:disabled) {
+  border-color: rgba(108, 181, 212, 0.5);
+  color: var(--accent);
+}
+.powerup-btn.shield:not(.used):hover:not(:disabled) {
+  background: rgba(108, 181, 212, 0.1);
+  border-color: var(--accent);
+}
+.powerup-btn.reroll:not(.used):not(:disabled) {
+  border-color: rgba(109, 190, 133, 0.5);
+  color: var(--success);
+}
+.powerup-btn.reroll:not(.used):hover:not(:disabled) {
+  background: rgba(109, 190, 133, 0.1);
+  border-color: var(--success);
+}
+.powerup-btn.used,
+.powerup-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.powerup-count {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
+}
+.shield-active-badge {
+  padding: 6px 10px;
+  background: rgba(108, 181, 212, 0.1);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--accent);
+  text-align: center;
+  font-weight: 600;
+  animation: shield-glow 1.8s ease-in-out infinite;
+}
+@keyframes shield-glow {
+  0%, 100% { box-shadow: 0 0 4px rgba(108, 181, 212, 0.3); }
+  50%       { box-shadow: 0 0 12px rgba(108, 181, 212, 0.6); }
+}
+
+@media (max-width: 960px) {
+  .room-layout {
+    flex-direction: column;
+  }
+  .room-sidebar {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+  .powerup-buttons {
+    flex-direction: row;
+  }
+  .powerup-btn {
+    flex: 1;
+  }
 }

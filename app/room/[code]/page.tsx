@@ -406,6 +406,12 @@ export default function Page() {
  if (!pendingRun) return;
  setReviewing(false);
  setCountdown(3);
+ // Initialise les power-ups pour chaque membre présent
+ const ups: Record<string, { joker: number; shield: number; reroll: number }> = {};
+ if (state.powerUpsEnabled !== false) {
+   members.forEach((m) => { ups[m.steamId] = { joker: 1, shield: 1, reroll: 1 }; });
+ }
+ setState((s) => ({ ...s, powerUps: ups, shieldActive: false }));
  playClick();
  };
 
@@ -448,6 +454,69 @@ export default function Page() {
  swapTimer.current = setTimeout(() => setSwappedIdx(null), 700);
  setState((s) => ({ ...s, run: newRun, pinned: newPinned, champions: newChampions }));
  playClick();
+ };
+
+ // === POWER-UPS ===
+ const useJoker = (steamId: string) => {
+   setState((s) => {
+     const pu = s.powerUps[steamId];
+     if (!pu || pu.joker <= 0 || s.run.length === 0) return s;
+     const undone = s.run.filter((id) => !s.done.includes(id));
+     if (undone.length === 0) return s;
+     const gameToSwap = undone[Math.floor(Math.random() * undone.length)];
+     const idx = s.run.indexOf(gameToSwap);
+     const available = POOL.filter((g) => !s.run.includes(g.id));
+     if (available.length === 0) return s;
+     const newGame = available[Math.floor(Math.random() * available.length)];
+     const newRun = [...s.run];
+     newRun[idx] = newGame.id;
+     const newPinned = s.pinned.filter((x) => x !== gameToSwap);
+     const newChampions = { ...s.champions };
+     delete newChampions[gameToSwap];
+     return {
+       ...s,
+       run: newRun,
+       pinned: newPinned,
+       champions: newChampions,
+       powerUps: { ...s.powerUps, [steamId]: { ...pu, joker: pu.joker - 1 } },
+     };
+   });
+   playClick();
+ };
+
+ const useShield = (steamId: string) => {
+   setState((s) => {
+     const pu = s.powerUps[steamId];
+     if (!pu || pu.shield <= 0 || s.shieldActive) return s;
+     return {
+       ...s,
+       shieldActive: true,
+       powerUps: { ...s.powerUps, [steamId]: { ...pu, shield: pu.shield - 1 } },
+     };
+   });
+   playClick();
+ };
+
+ const useReroll = (steamId: string) => {
+   const currentGameId = state.run[state.current];
+   if (!currentGameId) return;
+   if (!state.champions[currentGameId]) return;
+   const currentGame = POOL.find((g) => g.id === currentGameId);
+   if (!currentGame) return;
+   const effMode = effectiveMode(currentGame, state.difficulty);
+   if (effMode !== "solo" && effMode !== "duo") return;
+   setState((s) => {
+     const pu = (s.powerUps ?? {})[steamId];
+     if (!pu || pu.reroll <= 0) return s;
+     const newChampions = { ...s.champions };
+     delete newChampions[currentGameId];
+     return {
+       ...s,
+       champions: newChampions,
+       powerUps: { ...s.powerUps, [steamId]: { ...pu, reroll: pu.reroll - 1 } },
+     };
+   });
+   setTimeout(() => drawChampion(currentGameId, effMode as "solo" | "duo"), 80);
  };
 
  // === SLOT MACHINE DRAW ===
@@ -590,6 +659,12 @@ export default function Page() {
 
  const loseGame = (gameId: number) => {
  setState((s) => {
+   if (s.shieldActive) {
+     const g = POOL.find((x) => x.id === gameId);
+     const msg = `Défaite sur ${g?.name ?? "ce jeu"} — le Bouclier a absorbé la pénalité !`;
+     setOverlay({ kind: "lose", msg });
+     return { ...s, shieldActive: false };
+   }
  const g = POOL.find((x) => x.id === gameId);
  const idx = s.run.indexOf(gameId);
  const runFails = { ...s.runFails, [gameId]: (s.runFails[gameId] || 0) + 1 };
@@ -732,7 +807,8 @@ export default function Page() {
  {/* Confetti canvas */}
  <canvas id="confettiCanvas"ref={confettiRef}></canvas>
 
- <div className="container">
+ <div className="room-layout">
+ <div className="room-main">
  {/* ROOM BANNER */}
  <div className="room-banner">
    <div className="room-banner-info">
@@ -831,6 +907,24 @@ export default function Page() {
  onClick={() => update({ penaltyMode: "stepback"as PenaltyMode })}
  >
  Recule d&apos;un jeu
+ </button>
+ </div>
+ </div>
+
+ <div className="field"style={{ marginTop: 18 }}>
+ <label>Atouts (Joker, Bouclier, Relance)</label>
+ <div className="toggle-group">
+ <button
+   className={`toggle ${state.powerUpsEnabled !== false ? "active" : ""}`}
+   onClick={() => update({ powerUpsEnabled: true })}
+ >
+   Activés
+ </button>
+ <button
+   className={`toggle ${state.powerUpsEnabled === false ? "active" : ""}`}
+   onClick={() => update({ powerUpsEnabled: false })}
+ >
+   Désactivés
  </button>
  </div>
  </div>
@@ -1174,6 +1268,61 @@ export default function Page() {
  </ul>
  </div>
 
+ </div>{/* end room-main */}
+
+ {state.powerUpsEnabled !== false && <aside className="room-sidebar">
+   <div className="powerups-panel">
+     <div className="powerups-title">⚡ Atouts</div>
+     {members.length === 0 ? (
+       <div className="powerups-empty">En attente de joueurs…</div>
+     ) : members.map((member) => {
+       const pu = (state.powerUps ?? {})[member.steamId] ?? { joker: 0, shield: 0, reroll: 0 };
+       const runActive = state.run.length > 0;
+       const currentGameId = state.run[state.current];
+       const canReroll = runActive && !!currentGameId && !!state.champions[currentGameId] && !state.done.includes(currentGameId);
+       return (
+         <div className="powerup-card" key={member.steamId}>
+           <div className="powerup-player">
+             <img src={member.avatarUrl} alt="" className="powerup-avatar" />
+             <span className="powerup-name">{member.displayName}</span>
+           </div>
+           <div className="powerup-buttons">
+             <button
+               className={`powerup-btn joker${pu.joker <= 0 ? " used" : ""}`}
+               disabled={pu.joker <= 0 || !runActive}
+               onClick={() => useJoker(member.steamId)}
+               title="Joker : échange un jeu aléatoire non validé de la run"
+             >
+               🃏 Joker <span className="powerup-count">×{pu.joker}</span>
+             </button>
+             <button
+               className={`powerup-btn shield${pu.shield <= 0 || state.shieldActive === true ? " used" : ""}`}
+               disabled={pu.shield <= 0 || state.shieldActive === true}
+               onClick={() => useShield(member.steamId)}
+               title="Bouclier : annule la prochaine défaite"
+             >
+               🛡️ Bouclier <span className="powerup-count">×{pu.shield}</span>
+             </button>
+             <button
+               className={`powerup-btn reroll${pu.reroll <= 0 || !canReroll ? " used" : ""}`}
+               disabled={pu.reroll <= 0 || !canReroll}
+               onClick={() => useReroll(member.steamId)}
+               title="Relance : retire le champion au sort"
+             >
+               🎲 Relance <span className="powerup-count">×{pu.reroll}</span>
+             </button>
+           </div>
+         </div>
+       );
+     })}
+     {state.shieldActive && (
+       <div className="shield-active-badge">🛡️ Bouclier actif !</div>
+     )}
+   </div>
+ </aside>}
+
+ </div>{/* end room-layout */}
+
  {/* OVERLAYS */}
  {overlay.kind === "win" && (
  <div className="overlay win">
@@ -1275,7 +1424,6 @@ export default function Page() {
      </div>
    );
  })()}
- </div>
  </>
  );
 }

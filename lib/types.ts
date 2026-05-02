@@ -40,6 +40,12 @@ export interface SteamLink {
   profileUrl: string;
 }
 
+export interface PowerUp {
+  joker: number;   // swaps remaining
+  shield: number;  // shields remaining
+  reroll: number;  // champion re-draws remaining
+}
+
 export interface GauntletState {
   attempt: number;
   current: number;
@@ -58,8 +64,10 @@ export interface GauntletState {
   runStartTime: number | null;
   runFails: Record<number, number>;
   history: RunHistoryEntry[];
-  /** Per-slot Steam account binding (key = slot index 0..2). */
   steamLinks: Record<number, SteamLink>;
+  powerUps: Record<string, PowerUp>; // steamId → remaining power-ups
+  shieldActive: boolean;             // true = next defeat is negated
+  powerUpsEnabled: boolean;          // whether the power-up system is active
 }
 
 export const DEFAULT_STATE: GauntletState = {
@@ -81,4 +89,7 @@ export const DEFAULT_STATE: GauntletState = {
   runFails: {},
   history: [],
   steamLinks: {},
+  powerUps: {},
+  shieldActive: false,
+  powerUpsEnabled: true,
 };
