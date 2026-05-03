@@ -5,12 +5,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/session-cookie";
 
 // Paths accessible without auth
-const PUBLIC_API_PREFIXES = ["/api/auth/"];
+const PUBLIC_API_PREFIXES = ["/api/auth/", "/socket.io/"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Always allow public API routes (Steam OAuth callbacks, etc.)
+  // Always allow public API routes (Steam OAuth callbacks, Socket.io transport, etc.)
   if (PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
