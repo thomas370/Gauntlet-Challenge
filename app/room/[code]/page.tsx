@@ -72,8 +72,6 @@ function GameCover({ appid, cover, name, size = "md" }: { appid?: number; cover?
   );
 }
 
-const STORAGE_KEY = "gauntlet_v3";
-
 function shuffle<T>(arr: T[]): T[] {
  const a = [...arr];
  for (let i = a.length - 1; i > 0; i--) {
@@ -133,7 +131,12 @@ export default function Page() {
  // === ROOM CLOSED HANDLER ===
  useEffect(() => {
    if (closed) {
-     alert(closed === "expired" ? "La room a expiré." : closed === "empty" ? "La room a été fermée." : `Room fermée (${closed}).`);
+     const msg =
+       closed === "expired"   ? "La room a expiré." :
+       closed === "empty"     ? "La room a été fermée (plus aucun joueur)." :
+       closed === "not_found" ? "Room introuvable — le serveur a peut-être redémarré." :
+       `Room fermée (${closed}).`;
+     alert(msg);
      router.replace("/lobby");
    }
  }, [closed, router]);
@@ -1220,7 +1223,7 @@ export default function Page() {
 ) : (
  state.history.map((entry) => {
  const failed = entry.failedGameId ? POOL.find((g) => g.id === entry.failedGameId) : null;
- const tag = entry.outcome === "win" ? "" : "";
+ const tag = entry.outcome === "win" ? "🏆" : "💀";
  const status = entry.outcome === "win" ? "GAUNTLET WIN" : "Failed";
  return (
  <div

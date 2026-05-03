@@ -3,7 +3,6 @@
  * Start: tsx --tsconfig tsconfig.server.json server.ts
  */
 
-// Catch any unhandled error so it always prints instead of silently exiting.
 process.on("uncaughtException", (err) => {
   console.error("[server] uncaughtException:", err);
   process.exit(1);
@@ -62,11 +61,35 @@ app.prepare()
       handle(req, res, parsedUrl);
     });
 
+    const corsOrigin = dev
+      ? "*"
+      : (process.env.FRONTEND_URL ?? process.env.STEAM_REALM ?? "*");
+
     const io = new SocketIOServer(httpServer, {
+      // ── TIMING FIX ─────────────────────────────────────────────────────────
+      // pingTimeout DOIT être > pingInterval, sinon le serveur déclare le client
+      // mort avant que le pong puisse arriver → déconnexions en boucle.
+      // pingInterval = durée max d'un GET long-poll avant d'envoyer un ping.
+      // pingTimeout  = délai max pour recevoir le pong après avoir envoyé le ping.
+      pingInterval: 10_000,  // GET poll toutes les 10s (plus réactif)
+      pingTimeout:  30_000,  // attendre 30s le pong (bien > pingInterval)
+      upgradeTimeout: 15_000,
+      // Polling d'abord (connexion instantanée) puis upgrade WebSocket si dispo.
+      // C'est l'ordre par défaut Socket.io — plus fiable derrière un proxy.
+      transports: ["polling", "websocket"],
       cors: {
-        origin: process.env.FRONTEND_URL ?? `http://localhost:${port}`,
+        origin: corsOrigin,
         credentials: true,
       },
+    });
+
+    // ── PROXY BUFFERING FIX ─────────────────────────────────────────────────
+    // AlwaysData utilise nginx qui bufferise les réponses proxy par défaut.
+    // Sans ce header, les données Socket.io (polling) arrivent en retard ou jamais.
+    // X-Accel-Buffering: no → nginx envoie les octets dès qu'ils arrivent.
+    io.engine.on("headers", (headers: Record<string, string>) => {
+      headers["X-Accel-Buffering"] = "no";
+      headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
     });
 
     // ── auth middleware ──────────────────────────────────────────────────────
@@ -94,37 +117,54 @@ app.prepare()
         unsub = null;
       };
 
+      // ── join ───────────────────────────────────────────────────────────────
       socket.on("join", ({ code }: { code: string }) => {
-        cleanup();
+        cleanup(); // quitte la room précédente si l'utilisateur switche
+
         const joined = joinRoom(code, user);
         if ("error" in joined) {
-          socket.emit("room_error", { message: joined.error });
+          socket.emit("room_error", { message: joined.error, code: "NOT_FOUND" });
           return;
         }
+
         currentCode = code;
+
         const result = subscribe(code, user.steamId, (event) => {
           socket.emit(event.type, event);
         });
+
         if ("error" in result) {
-          socket.emit("room_error", { message: result.error });
+          socket.emit("room_error", { message: result.error, code: "NOT_FOUND" });
+          // joinRoom a réussi mais subscribe a échoué → nettoyer le membre
+          leaveRoom(code, user.steamId);
           currentCode = null;
           return;
         }
+
         unsub = result.unsubscribe;
-        socket.emit("state", { type: "state", state: result.snapshot.state });
+
+        // Snapshot initial — le client l'utilise pour peupler son état
+        socket.emit("state",   { type: "state",   state:   result.snapshot.state });
         socket.emit("members", { type: "members", members: result.snapshot.members });
       });
 
+      // ── mutate ─────────────────────────────────────────────────────────────
       socket.on("mutate", ({ state }: { state: GauntletState }) => {
         if (!currentCode) return;
-        mutateState(currentCode, user.steamId, state);
+        const result = mutateState(currentCode, user.steamId, state);
+        if ("error" in result) {
+          // Si la room n'existe plus, signaler au client pour qu'il redirige
+          console.warn(`[server] mutate failed for ${user.steamId}: ${result.error}`);
+          socket.emit("room_error", { message: result.error, code: "NOT_FOUND" });
+        }
       });
 
+      // ── leave / disconnect ─────────────────────────────────────────────────
       socket.on("leave", cleanup);
       socket.on("disconnect", cleanup);
     });
 
-    // ── listen ───────────────────────────────────────────────────────────────
+    // ── listen ────────────────────────────────────────────────────────────────
     httpServer.listen(port, () => {
       console.log(`> Ready on http://localhost:${port} [${dev ? "dev" : "prod"}]`);
     });
