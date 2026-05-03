@@ -57,17 +57,24 @@ export async function resolveOwnership(
   }
   if (missing.length === 0) return out;
 
-  // 2. Profile visibility.
+  // 2. Profile summary (used for the publicProfile field on every result).
   const summary = await getPlayerSummary(steamId);
   const publicProfile = summary
     ? { displayName: summary.personaname, avatarUrl: summary.avatarfull }
     : undefined;
-  const visible = (summary?.communityvisibilitystate ?? 1) === 3;
 
-  // 3. Try API for public profiles only.
+  // 3. Try GetOwnedGames regardless of communityvisibilitystate. The "game
+  //    details" privacy setting is independent from the profile-visibility
+  //    setting — Steam can return a full library for a friends-only profile,
+  //    and an empty response for a public one. So we always try, and use the
+  //    response itself as the signal:
+  //      - non-empty → authoritative for everything in the library
+  //      - empty     → library is hidden from us; treat as "no signal" and
+  //                    fall through to the XML / free-to-play fallbacks
+  //                    (instead of stamping every game as `owned: false`).
   let apiGames: Map<number, SteamOwnedGame> | null = null;
-  if (visible) {
-    const games = await getOwnedGames(steamId, missing);
+  const games = await getOwnedGames(steamId);
+  if (games.length > 0) {
     apiGames = new Map(games.map((g) => [g.appid, g]));
   }
 

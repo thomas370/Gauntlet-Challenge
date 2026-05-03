@@ -55,22 +55,23 @@ export async function getPlayerSummary(steamId: string): Promise<SteamPlayerSumm
 }
 
 /**
- * GetOwnedGames. Returns the games array (empty if profile is private).
- * `appIdsFilter` narrows the response server-side; if omitted, returns the full library.
+ * GetOwnedGames. Returns the user's full visible library (empty if game-details
+ * privacy hides it). Cached for 5 min per steamId so a run with multiple games
+ * only triggers one Steam call. We deliberately don't pass appids_filter — the
+ * per-key array form (`appids_filter[0]=…`) is sometimes silently ignored by
+ * Steam, which wipes the response and made everything look unowned. Filtering
+ * locally against the full library is reliable.
  */
-export async function getOwnedGames(
-  steamId: string,
-  appIdsFilter?: number[],
-): Promise<SteamOwnedGame[]> {
+export async function getOwnedGames(steamId: string): Promise<SteamOwnedGame[]> {
+  const cacheKey = `games:${steamId}`;
+  const cached = cache.get<SteamOwnedGame[]>(cacheKey);
+  if (cached !== undefined) return cached;
   const params = new URLSearchParams({
     key: env.STEAM_API_KEY,
     steamid: steamId,
     include_appinfo: "true",
     include_played_free_games: "true",
   });
-  if (appIdsFilter && appIdsFilter.length > 0) {
-    appIdsFilter.forEach((id, i) => params.set(`appids_filter[${i}]`, String(id)));
-  }
   const url = `${API_BASE}/IPlayerService/GetOwnedGames/v1/?${params.toString()}`;
   const res = await steamFetch(url);
   if (res.status === 401 || res.status === 403) {
@@ -78,5 +79,7 @@ export async function getOwnedGames(
   }
   if (!res.ok) throw new HttpError(502, `Steam API error ${res.status}`);
   const data = (await res.json()) as GetOwnedGamesResponse;
-  return data.response.games ?? [];
+  const games = data.response.games ?? [];
+  cache.set(cacheKey, games, 300);
+  return games;
 }

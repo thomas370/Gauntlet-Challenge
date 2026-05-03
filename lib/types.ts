@@ -68,6 +68,14 @@ export interface GauntletState {
   powerUps: Record<string, PowerUp>; // steamId → remaining power-ups
   shieldActive: boolean;             // true = next defeat is negated
   powerUpsEnabled: boolean;          // whether the power-up system is active
+  // Per-member Steam ownership for the games in the current run.
+  // Outer key: steamId. Inner key: appid (as string, JSON-safe). Value:
+  // true=owned, false=not owned. Absent means "unknown / not yet checked".
+  ownership: Record<string, Record<string, boolean>>;
+  // Manual claims (or denials) made by clicking your own chip. Always wins
+  // over `ownership` for the UI. Used to override Steam when the API can't
+  // see a private library or the user just wants to assert ownership.
+  ownershipOverride: Record<string, Record<string, boolean>>;
 }
 
 export const DEFAULT_STATE: GauntletState = {
@@ -92,4 +100,6 @@ export const DEFAULT_STATE: GauntletState = {
   powerUps: {},
   shieldActive: false,
   powerUpsEnabled: true,
+  ownership: {},
+  ownershipOverride: {},
 };

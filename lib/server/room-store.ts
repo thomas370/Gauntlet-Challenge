@@ -206,11 +206,21 @@ export function leaveRoom(code: string, steamId: string): boolean {
  * reconnects (and a new subscribe happens), call `cancelPendingLeave` to abort.
  * When the timer fires, the user is removed but the room is preserved so they
  * can come back to the same URL after a reboot. Returns false if the room or
- * member doesn't exist.
+ * member doesn't exist, OR if the user still has another live subscriber in
+ * the room (e.g. a second tab, or a new socket that already raced ahead of the
+ * old socket's `disconnect` event). Without that last check, a refresh whose
+ * new-socket `join` arrives before the old-socket `disconnect` would set a
+ * doomed timer that removes the user 30 s later — and re-adding them puts them
+ * at the end of the member Map, swapping their position.
  */
 export function schedulePendingLeave(code: string, steamId: string, graceMs: number): boolean {
   const r = rooms.get(code.toUpperCase());
   if (!r || !r.members.has(steamId)) return false;
+  let hasLiveSubscriber = false;
+  r.subscribers.forEach((sub) => {
+    if (sub.steamId === steamId) hasLiveSubscriber = true;
+  });
+  if (hasLiveSubscriber) return false;
   const existing = r.pendingLeaves.get(steamId);
   if (existing) clearTimeout(existing);
   const timer = setTimeout(() => {

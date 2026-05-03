@@ -8,21 +8,37 @@ import type { RoomSnapshot } from "@/lib/types/room";
 export default function LobbyPage() {
   const router = useRouter();
   const [user, setUser] = useState<SteamSessionUser | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((d: { user: SteamSessionUser | null }) => {
-        if (!d.user) {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (cancelled) return;
+        if (!res.ok) {
+          setAuthError(`Le serveur a répondu ${res.status} ${res.statusText}.`);
+          return;
+        }
+        const data = (await res.json()) as { user: SteamSessionUser | null };
+        if (cancelled) return;
+        if (!data.user) {
+          // /api/auth/me returns null + clears any stale cookie. Safe to redirect.
           router.replace("/login");
           return;
         }
-        setUser(d.user);
-      })
-      .catch(() => router.replace("/login"));
+        setUser(data.user);
+      } catch (e) {
+        if (cancelled) return;
+        // Network failure (server down, mid-request shutdown, blocked by proxy).
+        // Don't auto-redirect — that just loops. Show the error so we know.
+        setAuthError(`Connexion au serveur impossible : ${(e as Error).message}`);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [router]);
 
   const createRoom = async () => {
@@ -64,6 +80,29 @@ export default function LobbyPage() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.replace("/login");
   };
+
+  if (authError) {
+    return (
+      <main className="auth-shell">
+        <div className="auth-card">
+          <h1 className="auth-title">Erreur</h1>
+          <p className="auth-error">{authError}</p>
+          <button className="auth-btn" onClick={() => window.location.reload()}>
+            Réessayer
+          </button>
+          <button
+            className="auth-btn auth-btn-secondary"
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+              router.replace("/login");
+            }}
+          >
+            Se reconnecter
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (!user) {
     return (

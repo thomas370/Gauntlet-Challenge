@@ -205,6 +205,37 @@ app.prepare()
     httpServer.listen(port, () => {
       console.log(`> Ready on http://localhost:${port} [${dev ? "dev" : "prod"}]`);
     });
+
+    // ── graceful shutdown ────────────────────────────────────────────────────
+    // AlwaysData (and most managed hosts) sends SIGTERM when stopping/restarting
+    // the upstream. Without a handler, Node exits abruptly — in-flight HTTP
+    // requests get a TCP reset, socket.io clients see an unclean disconnect.
+    // Closing properly lets responses finish and emits a clean disconnect to
+    // every subscriber so the client-side grace period works as intended.
+    let shuttingDown = false;
+    const shutdown = (signal: string) => {
+      if (shuttingDown) return;
+      shuttingDown = true;
+      console.log(`[server] received ${signal}, draining…`);
+      // Stop accepting new connections.
+      httpServer.close((err) => {
+        if (err) console.error("[server] httpServer.close error:", err);
+        else console.log("[server] HTTP server closed");
+      });
+      // Disconnect all socket.io clients (sends a clean close frame so the
+      // client's reconnect logic kicks in immediately on the next page load).
+      io.close(() => {
+        console.log("[server] socket.io closed, exiting");
+        process.exit(0);
+      });
+      // Belt-and-braces: don't hang forever if some connection refuses to die.
+      setTimeout(() => {
+        console.error("[server] graceful shutdown timed out, forcing exit");
+        process.exit(1);
+      }, 10_000).unref();
+    };
+    process.on("SIGTERM", () => shutdown("SIGTERM"));
+    process.on("SIGINT",  () => shutdown("SIGINT"));
   })
   .catch((err) => {
     console.error("[server] app.prepare() failed:", err);

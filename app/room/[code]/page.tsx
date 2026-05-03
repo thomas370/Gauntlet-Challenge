@@ -141,6 +141,53 @@ export default function Page() {
    }
  }, [closed, router]);
 
+ // === OWNERSHIP FETCH ===
+ // For every Steam-backed game in the current run, ask /api/steam/owns whether
+ // *I* own it. Publish the result into shared state so other members see the
+ // same matrix. Each client only ever publishes its own row of the map.
+ const runAppIdsKey = state.run
+   .map((id) => POOL.find((g) => g.id === id)?.appid)
+   .filter((a): a is number => typeof a === "number")
+   .join(",");
+ useEffect(() => {
+   if (!me) return;
+   if (!runAppIdsKey) return;
+   const runAppIds = runAppIdsKey.split(",").map(Number).filter((n) => Number.isFinite(n));
+   if (runAppIds.length === 0) return;
+
+   let cancelled = false;
+   // refresh=true so we bypass any stale per-appid cache on the server side
+   // (the upstream Steam call is still gated by a 5-minute library cache, so
+   // this isn't a free pass to hammer the API). Always re-fetching on mount /
+   // run change also means a flipped privacy setting or a newly-bought game
+   // shows up on the next page load instead of waiting 10 minutes.
+   fetch("/api/steam/owns?refresh=true", {
+     method: "POST",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ appIds: runAppIds }),
+   })
+     .then((r) => (r.ok ? r.json() : null))
+     .then((data: { results?: Record<string, boolean | "unknown"> } | null) => {
+       if (cancelled || !data?.results) return;
+       const updates: Record<string, boolean> = {};
+       for (const [appid, owned] of Object.entries(data.results)) {
+         // Skip "unknown" — leave the slot empty so the next mount retries.
+         if (typeof owned === "boolean") updates[appid] = owned;
+       }
+       if (Object.keys(updates).length === 0) return;
+       setState((s) => ({
+         ...s,
+         ownership: {
+           ...(s.ownership ?? {}),
+           [me.steamId]: { ...(s.ownership?.[me.steamId] ?? {}), ...updates },
+         },
+       }));
+     })
+     .catch(() => {});
+
+   return () => { cancelled = true; };
+ }, [me?.steamId, runAppIdsKey, setState]);
+
 
 
 
@@ -524,6 +571,32 @@ export default function Page() {
    setTimeout(() => drawChampion(currentGameId, effMode as "solo" | "duo"), 80);
  };
 
+ // === OWNERSHIP OVERRIDE ===
+ // Click your own avatar on a game card to claim/un-claim ownership when Steam
+ // can't see your library (private game-details setting) or just got it wrong.
+ // Cycles: unknown/missing → owned → not owned → owned → … Steam-fetched data
+ // stays in `ownership`; this only writes to `ownershipOverride`, which the
+ // chip renderer prefers when present.
+ const toggleOwnershipOverride = (appid: number) => {
+   if (!me) return;
+   const key = String(appid);
+   setState((s) => {
+     const myOverrides = { ...(s.ownershipOverride?.[me.steamId] ?? {}) };
+     const current = myOverrides[key];
+     const auto = s.ownership?.[me.steamId]?.[key];
+     const displayed = current !== undefined ? current : auto;
+     myOverrides[key] = displayed !== true; // unknown/false → true ; true → false
+     return {
+       ...s,
+       ownershipOverride: {
+         ...(s.ownershipOverride ?? {}),
+         [me.steamId]: myOverrides,
+       },
+     };
+   });
+   playClick();
+ };
+
  // === SLOT MACHINE DRAW ===
  const drawChampion = (gameId: number, mode: "solo" | "duo") => {
  const players = members.map((m) => m.displayName).filter((p) => p && p.trim());
@@ -815,6 +888,9 @@ export default function Page() {
  <canvas id="confettiCanvas"ref={confettiRef}></canvas>
 
  <div className="room-layout">
+ {/* Mirror spacer — keeps `room-main` centered between the spacer (left) and
+     the Atouts sidebar (right). Rendered only when the sidebar is rendered. */}
+ {state.powerUpsEnabled !== false && <div className="room-spacer" aria-hidden="true" />}
  <div className="room-main">
  {/* ROOM BANNER */}
  <div className="room-banner">
@@ -862,11 +938,12 @@ export default function Page() {
           </div>
  </div>
 
- {/* CONFIG */}
+ {/* CONFIG — hidden once a run is generated. Reopens after Reset complet. */}
+ {!runLocked && (
+ <>
  <div className="panel">
  <h2>
    <span className="panel-title"><span className="panel-section-num">1</span> Configuration</span>
-   {runLocked && <span className="config-locked-badge">🔒 Verrouillé — run en cours</span>}
  </h2>
  <div className="setup-grid">
  {[0, 1, 2].map((i) => {
@@ -1035,6 +1112,8 @@ export default function Page() {
  </button>
  </div>
  </div>
+ </>
+ )}
 
  {/* RUN */}
  <div className="panel"id="runPanel">
@@ -1112,6 +1191,46 @@ export default function Page() {
  <div className={`game-objective ${state.difficulty === "hardcore" ? "hc" : ""}`}>
  Objectif : <strong>{objective}</strong>
  </div>
+ {g.appid && members.length > 0 && (
+ <div className="game-owners" aria-label="Possession Steam">
+ {members.map((m) => {
+ const key = String(g.appid);
+ const auto = state.ownership?.[m.steamId]?.[key];
+ const override = state.ownershipOverride?.[m.steamId]?.[key];
+ const owned = override !== undefined ? override : auto;
+ const status = owned === true ? "owns" : owned === false ? "missing" : "unknown";
+ const isMe = me?.steamId === m.steamId;
+ const isOverride = override !== undefined;
+ const baseTip =
+ status === "owns" ? `${m.displayName} possède ${g.name}` :
+ status === "missing" ? `${m.displayName} n'a pas ${g.name} sur Steam` :
+ `${m.displayName} : possession inconnue (profil privé ?)`;
+ const tip =
+ isMe ? `${baseTip} — clique pour ${owned === true ? "indiquer que tu ne l'as pas" : "indiquer que tu l'as"}` :
+ isOverride ? `${baseTip} (déclaration manuelle)` :
+ baseTip;
+ return (
+ <span
+ key={m.steamId}
+ className={`owner-chip ${status}${isMe ? " clickable" : ""}${isOverride ? " override" : ""}`}
+ title={tip}
+ onClick={isMe && g.appid ? () => toggleOwnershipOverride(g.appid as number) : undefined}
+ role={isMe ? "button" : undefined}
+ tabIndex={isMe ? 0 : undefined}
+ onKeyDown={isMe && g.appid ? (e) => {
+ if (e.key === "Enter" || e.key === " ") {
+ e.preventDefault();
+ toggleOwnershipOverride(g.appid as number);
+ }
+ } : undefined}
+ >
+ <img src={m.avatarUrl} alt="" />
+ <span className="owner-mark">{status === "owns" ? "✓" : status === "missing" ? "✗" : "?"}</span>
+ </span>
+ );
+ })}
+ </div>
+ )}
  {isSolo && (
  <div className="game-champion">
  {isDrawing && slotData ? (

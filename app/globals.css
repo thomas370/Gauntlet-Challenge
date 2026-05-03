@@ -1120,6 +1120,63 @@ html, body {
 .game-objective strong { color: var(--text); font-weight: 500; }
 .game-objective.hc strong { color: var(--text); }
 
+.game-owners {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.owner-chip {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+}
+.owner-chip img {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+.owner-chip .owner-mark {
+  position: absolute;
+  bottom: -2px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  font-size: 9px;
+  line-height: 10px;
+  text-align: center;
+  font-weight: 700;
+}
+.owner-chip.owns img { border-color: var(--success); }
+.owner-chip.owns .owner-mark { color: var(--success); border-color: var(--success); }
+.owner-chip.missing img { opacity: 0.45; filter: grayscale(70%); border-color: var(--danger); }
+.owner-chip.missing .owner-mark { color: var(--danger); border-color: var(--danger); }
+.owner-chip.unknown img { opacity: 0.55; }
+.owner-chip.unknown .owner-mark { color: var(--muted); }
+
+/* Your own chip is clickable so you can manually claim ownership when Steam
+   can't see your library. */
+.owner-chip.clickable {
+  cursor: pointer;
+  transition: transform 0.1s ease, filter 0.1s ease;
+}
+.owner-chip.clickable:hover { transform: scale(1.12); }
+.owner-chip.clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Manually overridden chips get a dashed border on the mark badge so users
+   can tell at a glance which entries are claimed vs API-confirmed. */
+.owner-chip.override .owner-mark {
+  border-style: dashed;
+}
+
 .game-champion {
   margin-top: 6px;
   padding: 6px 10px;
@@ -1771,9 +1828,13 @@ body.shake { animation: none; }
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
 }
 
-/* ====== ROOM LAYOUT (main + sticky sidebar) ====== */
+/* ====== ROOM LAYOUT (main + sticky sidebar) ======
+   Symmetric layout: an invisible spacer on the left mirrors the Atouts sidebar
+   on the right, so `.room-main` is always centered between them. When the
+   sidebar isn't rendered (powerUps disabled) the spacer isn't either, and
+   `.room-main` fills the layout normally. */
 .room-layout {
-  max-width: 1380px;
+  max-width: 1640px;
   margin: 0 auto;
   padding: 32px 24px 80px;
   position: relative;
@@ -1781,6 +1842,12 @@ body.shake { animation: none; }
   display: flex;
   gap: 20px;
   align-items: flex-start;
+}
+.room-spacer {
+  width: 230px;
+  flex-shrink: 0;
+  /* Invisible — its only job is to balance the sidebar's footprint so main
+     stays centered on the page. */
 }
 .room-main {
   flex: 1;
@@ -1926,15 +1993,23 @@ body.shake { animation: none; }
   50%       { box-shadow: 0 0 12px rgba(108, 181, 212, 0.6); }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1280px) {
+  /* Below this width the side-by-side layout starts squeezing the run panel.
+     Stack vertically: drop the spacer, send the sidebar below the main column. */
   .room-layout {
     flex-direction: column;
+  }
+  .room-spacer {
+    display: none;
   }
   .room-sidebar {
     width: 100%;
     position: static;
     max-height: none;
   }
+}
+
+@media (max-width: 960px) {
   .powerup-buttons {
     flex-direction: row;
   }
