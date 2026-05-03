@@ -1,13 +1,19 @@
 /**
  * Custom Next.js server with Socket.io WebSocket support.
- *
- * Run with:
- *   dev  → tsx --tsconfig tsconfig.server.json server.ts
- *   prod → node -r tsx/cjs server.ts   (or compile first)
- *
- * Socket.io handles all real-time room events (join / mutate / leave).
- * Next.js handles everything else (pages, API routes, static assets).
+ * Start: tsx --tsconfig tsconfig.server.json server.ts
  */
+
+// Catch any unhandled error so it always prints instead of silently exiting.
+process.on("uncaughtException", (err) => {
+  console.error("[server] uncaughtException:", err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[server] unhandledRejection:", reason);
+  process.exit(1);
+});
+
+console.log("[server] starting…");
 
 import { createServer } from "http";
 import { parse } from "url";
@@ -21,6 +27,8 @@ import type { SteamSessionUser } from "./lib/types/steam";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
+
+console.log(`[server] mode=${dev ? "dev" : "prod"} port=${port}`);
 
 // ── cookie helpers ──────────────────────────────────────────────────────────
 function parseCookies(header: string): Record<string, string> {
@@ -43,92 +51,85 @@ function parseCookies(header: string): Record<string, string> {
 const app = next({ dev });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
-  const httpServer = createServer((req, res) => {
-    const parsedUrl = parse(req.url ?? "/", true);
-    handle(req, res, parsedUrl);
-  });
+console.log("[server] calling app.prepare()…");
 
-  const io = new SocketIOServer(httpServer, {
-    // Default path (/socket.io/) — Next.js won't intercept it.
-    cors: {
-      origin: process.env.FRONTEND_URL ?? `http://localhost:${port}`,
-      credentials: true,
-    },
-  });
+app.prepare()
+  .then(() => {
+    console.log("[server] Next.js ready, starting HTTP server…");
 
-  // ── auth middleware ────────────────────────────────────────────────────────
-  io.use((socket, next) => {
-    const cookies = parseCookies(socket.handshake.headers.cookie ?? "");
-    const token = cookies[SESSION_COOKIE];
-    if (!token) return next(new Error("Not authenticated"));
-    const user = verifyToken(token);
-    if (!user) return next(new Error("Invalid session"));
-    (socket as Socket & { data: { user: SteamSessionUser } }).data.user = user;
-    next();
-  });
+    const httpServer = createServer((req, res) => {
+      const parsedUrl = parse(req.url ?? "/", true);
+      handle(req, res, parsedUrl);
+    });
 
-  // ── connection handler ─────────────────────────────────────────────────────
-  io.on("connection", (socket) => {
-    const user: SteamSessionUser = socket.data.user;
-    let currentCode: string | null = null;
-    let unsub: (() => void) | null = null;
+    const io = new SocketIOServer(httpServer, {
+      cors: {
+        origin: process.env.FRONTEND_URL ?? `http://localhost:${port}`,
+        credentials: true,
+      },
+    });
 
-    // Clean up current room subscription
-    const cleanup = () => {
-      if (!currentCode) return;
-      unsub?.();
-      leaveRoom(currentCode, user.steamId);
-      currentCode = null;
-      unsub = null;
-    };
+    // ── auth middleware ──────────────────────────────────────────────────────
+    io.use((socket, next) => {
+      const cookies = parseCookies(socket.handshake.headers.cookie ?? "");
+      const token = cookies[SESSION_COOKIE];
+      if (!token) return next(new Error("Not authenticated"));
+      const user = verifyToken(token);
+      if (!user) return next(new Error("Invalid session"));
+      (socket as Socket & { data: { user: SteamSessionUser } }).data.user = user;
+      next();
+    });
 
-    // ── join ────────────────────────────────────────────────────────────────
-    socket.on("join", ({ code }: { code: string }) => {
-      cleanup(); // leave previous room if switching
+    // ── connection handler ───────────────────────────────────────────────────
+    io.on("connection", (socket) => {
+      const user: SteamSessionUser = socket.data.user;
+      let currentCode: string | null = null;
+      let unsub: (() => void) | null = null;
 
-      const joined = joinRoom(code, user);
-      if ("error" in joined) {
-        socket.emit("room_error", { message: joined.error });
-        return;
-      }
+      const cleanup = () => {
+        if (!currentCode) return;
+        unsub?.();
+        leaveRoom(currentCode, user.steamId);
+        currentCode = null;
+        unsub = null;
+      };
 
-      currentCode = code;
-
-      // Subscribe: server pushes any broadcast back through this socket
-      const result = subscribe(code, user.steamId, (event) => {
-        socket.emit(event.type, event);
+      socket.on("join", ({ code }: { code: string }) => {
+        cleanup();
+        const joined = joinRoom(code, user);
+        if ("error" in joined) {
+          socket.emit("room_error", { message: joined.error });
+          return;
+        }
+        currentCode = code;
+        const result = subscribe(code, user.steamId, (event) => {
+          socket.emit(event.type, event);
+        });
+        if ("error" in result) {
+          socket.emit("room_error", { message: result.error });
+          currentCode = null;
+          return;
+        }
+        unsub = result.unsubscribe;
+        socket.emit("state", { type: "state", state: result.snapshot.state });
+        socket.emit("members", { type: "members", members: result.snapshot.members });
       });
 
-      if ("error" in result) {
-        socket.emit("room_error", { message: result.error });
-        currentCode = null;
-        return;
-      }
+      socket.on("mutate", ({ state }: { state: GauntletState }) => {
+        if (!currentCode) return;
+        mutateState(currentCode, user.steamId, state);
+      });
 
-      unsub = result.unsubscribe;
-
-      // Send initial snapshot to the joining client
-      socket.emit("state", { type: "state", state: result.snapshot.state });
-      socket.emit("members", { type: "members", members: result.snapshot.members });
+      socket.on("leave", cleanup);
+      socket.on("disconnect", cleanup);
     });
 
-    // ── mutate ──────────────────────────────────────────────────────────────
-    socket.on("mutate", ({ state }: { state: GauntletState }) => {
-      if (!currentCode) return;
-      mutateState(currentCode, user.steamId, state);
-      // mutateState broadcasts to all subscribers (including this socket),
-      // so the sender will also receive a "state" event back — same as before.
+    // ── listen ───────────────────────────────────────────────────────────────
+    httpServer.listen(port, () => {
+      console.log(`> Ready on http://localhost:${port} [${dev ? "dev" : "prod"}]`);
     });
-
-    // ── leave / disconnect ──────────────────────────────────────────────────
-    socket.on("leave", cleanup);
-    socket.on("disconnect", cleanup);
+  })
+  .catch((err) => {
+    console.error("[server] app.prepare() failed:", err);
+    process.exit(1);
   });
-
-  // ── start ──────────────────────────────────────────────────────────────────
-  httpServer.listen(port, () => {
-    const mode = dev ? "dev" : "prod";
-    console.log(`> Ready on http://localhost:${port} [${mode}]`);
-  });
-});
