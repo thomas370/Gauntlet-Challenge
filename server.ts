@@ -18,7 +18,14 @@ import { createServer } from "http";
 import { parse } from "url";
 import next from "next";
 import { Server as SocketIOServer, type Socket } from "socket.io";
-import { joinRoom, leaveRoom, subscribe, mutateState } from "./lib/server/room-store";
+import {
+  joinRoom,
+  leaveRoom,
+  subscribe,
+  mutateState,
+  schedulePendingLeave,
+  cancelPendingLeave,
+} from "./lib/server/room-store";
 import { verifyToken } from "./lib/server/verify-token";
 import { SESSION_COOKIE } from "./lib/session-cookie";
 import type { GauntletState } from "./lib/types";
@@ -26,6 +33,9 @@ import type { SteamSessionUser } from "./lib/types/steam";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = parseInt(process.env.PORT ?? "3000", 10);
+// How long a member stays in their room after their last socket drops. Refreshes
+// and brief network blips reconnect within this window and rejoin transparently.
+const ROOM_GRACE_MS = 30_000;
 
 console.log(`[server] mode=${dev ? "dev" : "prod"} port=${port}`);
 
@@ -109,17 +119,32 @@ app.prepare()
       let currentCode: string | null = null;
       let unsub: (() => void) | null = null;
 
-      const cleanup = () => {
-        if (!currentCode) return;
+      // Drop just the live subscriber. The user stays listed as a member of the
+      // room — refreshes and brief drops can reconnect inside the grace window.
+      const detach = () => {
         unsub?.();
+        unsub = null;
+      };
+
+      // Full leave: remove the user from the room's member list as well.
+      const fullLeave = () => {
+        if (!currentCode) return;
+        detach();
+        cancelPendingLeave(currentCode, user.steamId);
         leaveRoom(currentCode, user.steamId);
         currentCode = null;
-        unsub = null;
       };
 
       // ── join ───────────────────────────────────────────────────────────────
       socket.on("join", ({ code }: { code: string }) => {
-        cleanup(); // quitte la room précédente si l'utilisateur switche
+        // If the user is switching rooms on the same socket, fully leave the old one.
+        if (currentCode && currentCode.toUpperCase() !== code.toUpperCase()) {
+          fullLeave();
+        } else {
+          // Same room (or first join): just unsubscribe the old socket binding,
+          // membership is preserved.
+          detach();
+        }
 
         const joined = joinRoom(code, user);
         if ("error" in joined) {
@@ -127,6 +152,8 @@ app.prepare()
           return;
         }
 
+        // The user (re)connected — cancel any pending grace-period leave.
+        cancelPendingLeave(code, user.steamId);
         currentCode = code;
 
         const result = subscribe(code, user.steamId, (event) => {
@@ -159,9 +186,19 @@ app.prepare()
         }
       });
 
-      // ── leave / disconnect ─────────────────────────────────────────────────
-      socket.on("leave", cleanup);
-      socket.on("disconnect", cleanup);
+      // Explicit leave (button press, REST hop). Removes membership immediately.
+      socket.on("leave", fullLeave);
+
+      // Tab close / refresh / network blip: just detach this socket and start
+      // the grace timer. If they reconnect within ROOM_GRACE_MS the timer is
+      // cancelled in the join handler above; otherwise they're removed.
+      socket.on("disconnect", () => {
+        detach();
+        if (currentCode) {
+          schedulePendingLeave(currentCode, user.steamId, ROOM_GRACE_MS);
+          currentCode = null;
+        }
+      });
     });
 
     // ── listen ────────────────────────────────────────────────────────────────

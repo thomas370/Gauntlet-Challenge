@@ -65,7 +65,15 @@ export default function LobbyPage() {
     router.replace("/login");
   };
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <main className="auth-shell">
+        <div className="auth-card">
+          <p className="auth-subtitle">Chargement…</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="auth-shell">

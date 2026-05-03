@@ -43,10 +43,11 @@ export function createCode(): { code: string; expiresInSec: number } {
 
 /** Mark a code as claimed by the given Steam user. Returns false if expired/missing. */
 export function claimCode(code: string, user: SteamSessionUser): boolean {
-  const entry = codes.get(code);
+  const key = code.toUpperCase();
+  const entry = codes.get(key);
   if (!entry) return false;
   if (Date.now() - entry.createdAt > TTL_MS) {
-    codes.delete(code);
+    codes.delete(key);
     return false;
   }
   entry.claimed = user;

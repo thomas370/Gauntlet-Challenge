@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { env } from "./env";
+import { verifyToken } from "./verify-token";
 import type { SteamSessionUser } from "@/lib/types/steam";
 
 import { SESSION_COOKIE } from "@/lib/session-cookie";
@@ -14,19 +15,7 @@ export function signSession(user: SteamSessionUser): string {
   return jwt.sign(user, env.JWT_SECRET, { expiresIn: `${SESSION_TTL_DAYS}d`, algorithm: "HS256" });
 }
 
-export function verifySession(token: string): SteamSessionUser | null {
-  try {
-    const payload = jwt.verify(token, env.JWT_SECRET, { algorithms: ["HS256"] }) as
-      | (SteamSessionUser & { iat: number; exp: number })
-      | string;
-    if (typeof payload === "string") return null;
-    const { steamId, displayName, avatarUrl, profileUrl } = payload;
-    if (!steamId) return null;
-    return { steamId, displayName, avatarUrl, profileUrl };
-  } catch {
-    return null;
-  }
-}
+export const verifySession = verifyToken;
 
 export function sessionCookieAttrs() {
   return {

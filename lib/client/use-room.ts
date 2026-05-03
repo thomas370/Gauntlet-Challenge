@@ -90,7 +90,10 @@ export function useRoom(code: string): UseRoomResult {
     });
 
     return () => {
-      socket.emit("leave");
+      // Don't emit "leave" — disconnecting is enough. The server keeps the
+      // user in the room's member list during a short grace window so a
+      // refresh / brief drop can reconnect cleanly. Explicit leave goes
+      // through the REST endpoint when the user clicks "Quitter".
       socket.disconnect();
       socketRef.current = null;
     };
