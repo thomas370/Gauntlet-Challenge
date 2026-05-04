@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Temps Total</title>
+<link rel="stylesheet" href="/overlays/css/shared.css">
+</head>
+<body>
+  <div class="card accent-blue">
+    <div class="card-header">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>
+      </svg>
+      <span>Temps Total</span>
+    </div>
+    <div class="value blue" id="value">00:00:00</div>
+  </div>
+
+<script src="/overlays/js/time.js"></script>
+<script src="/overlays/js/client.js"></script>
+<script>
+  const el = document.getElementById('value');
+  function tick() {
+    const s = window.Overlay.state;
+    if (s) el.textContent = fmtHMS(liveTotalMs(s));
+  }
+  window.Overlay.subscribe(tick);
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

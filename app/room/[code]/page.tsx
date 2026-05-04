@@ -123,6 +123,10 @@ export default function Page() {
  const [countdown, setCountdown] = useState<number | null>(null);
  const [now, setNow] = useState<number>(Date.now());
  const [objTip, setObjTip] = useState<{ id: number; right: number; top: number; bottom: number; flipUp: boolean } | null>(null);
+ const [showOverlays, setShowOverlays] = useState(false);
+ const [overlayCopied, setOverlayCopied] = useState<string | null>(null);
+ const [overlayToken, setOverlayToken] = useState<string | null>(null);
+ const [overlayTokenLoading, setOverlayTokenLoading] = useState(false);
  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
  const audioCtxRef = useRef<AudioContext | null>(null);
  const confettiRef = useRef<HTMLCanvasElement | null>(null);
@@ -140,6 +144,18 @@ export default function Page() {
      router.replace("/lobby");
    }
  }, [closed, router]);
+
+ // === OVERLAY TOKEN — lazy fetch on first modal open ===
+ useEffect(() => {
+   if (!showOverlays || overlayToken || overlayTokenLoading) return;
+   setOverlayTokenLoading(true);
+   fetch("/api/me/overlay-token")
+     .then((r) => (r.ok ? r.json() : null))
+     .then((d: { token?: string } | null) => { if (d?.token) setOverlayToken(d.token); })
+     .catch(() => {})
+     .finally(() => setOverlayTokenLoading(false));
+ }, [showOverlays, overlayToken, overlayTokenLoading]);
+
 
  // === OWNERSHIP FETCH ===
  // For every Steam-backed game in the current run, ask /api/steam/owns whether
@@ -905,6 +921,7 @@ export default function Page() {
    </div>
    <div className="room-banner-actions">
      <button className="room-banner-btn" onClick={copyRoomLink} title="Copier le lien d'invitation">Inviter</button>
+     <button className="room-banner-btn" onClick={() => setShowOverlays(true)} title="Liens des overlays Twitch (OBS)">Overlays</button>
      <button className="room-banner-btn room-banner-leave" onClick={leaveRoom}>Quitter</button>
    </div>
  </div>
@@ -1561,6 +1578,68 @@ export default function Page() {
      <div className="floating-objectives-tooltip" style={style}>
        <div className="tt-row"><span className="tt-label tt-normal">Normal</span><span className="tt-text">{game.normal}</span></div>
        <div className="tt-row"><span className="tt-label tt-hardcore">Hardcore</span><span className="tt-text">{game.hardcore}</span></div>
+     </div>
+   );
+ })()}
+
+ {/* === OVERLAYS MODAL === */}
+ {showOverlays && (() => {
+   const widgets: { key: string; label: string; file: string }[] = [
+     { key: "total",    label: "Temps total",   file: "total-time.html" },
+     { key: "wins",     label: "Victoires",     file: "victories.html" },
+     { key: "resets",   label: "Resets",        file: "resets.html" },
+     { key: "current",  label: "Jeu en cours",  file: "current-game.html" },
+     { key: "list",     label: "Liste des jeux", file: "game-list.html" },
+   ];
+   const origin = typeof window !== "undefined" ? window.location.origin : "";
+   const buildUrl = (file: string) =>
+     overlayToken
+       ? `${origin}/overlays/widgets/${file}?token=${encodeURIComponent(overlayToken)}`
+       : "";
+   const copy = async (key: string, url: string) => {
+     try {
+       await navigator.clipboard.writeText(url);
+       setOverlayCopied(key);
+       setTimeout(() => setOverlayCopied((k) => (k === key ? null : k)), 1400);
+     } catch {
+       window.prompt("Copie ce lien :", url);
+     }
+   };
+   return (
+     <div className="overlay show" onClick={(e) => { if (e.target === e.currentTarget) setShowOverlays(false); }}>
+       <div className="overlay-links-modal">
+         <button className="overlay-links-close" onClick={() => setShowOverlays(false)} aria-label="Fermer">×</button>
+         <h3>Overlays Twitch</h3>
+         <p className="overlay-links-hint">
+           Sources navigateur OBS personnelles. À configurer une seule fois — les liens suivent ton
+           compte Steam et basculent automatiquement vers la room courante à chaque nouvelle run.
+           Garde-les privés : ils donnent un accès lecture à ton état de jeu.
+         </p>
+         {!overlayToken ? (
+           <div className="overlay-links-loading">
+             {overlayTokenLoading ? "Génération du token…" : "Token indisponible — réessaie."}
+           </div>
+         ) : (
+           <div className="overlay-links-list">
+             {widgets.map((w) => {
+               const url = buildUrl(w.file);
+               const copied = overlayCopied === w.key;
+               return (
+                 <div key={w.key} className="overlay-links-row">
+                   <div className="overlay-links-row-label">{w.label}</div>
+                   <input className="overlay-links-row-url" type="text" value={url} readOnly onFocus={(e) => e.currentTarget.select()} />
+                   <button
+                     className={`overlay-links-row-copy${copied ? " copied" : ""}`}
+                     onClick={() => copy(w.key, url)}
+                   >
+                     {copied ? "Copié !" : "Copier"}
+                   </button>
+                 </div>
+               );
+             })}
+           </div>
+         )}
+       </div>
      </div>
    );
  })()}

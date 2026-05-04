@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Victoires</title>
+<link rel="stylesheet" href="/overlays/css/shared.css">
+</head>
+<body>
+  <div class="card accent-green">
+    <div class="card-header">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
+        <path d="M6 4h12v7a6 6 0 0 1-12 0V4z"/>
+        <line x1="12" y1="15" x2="12" y2="20"/>
+        <line x1="8" y1="20" x2="16" y2="20"/>
+      </svg>
+      <span>Victoires</span>
+    </div>
+    <div class="value green">
+      <span id="wins">0</span><span class="suffix" id="goal">/10</span>
+    </div>
+  </div>
+
+<script src="/overlays/js/client.js"></script>
+<script>
+  const wins = document.getElementById('wins');
+  const goal = document.getElementById('goal');
+  window.Overlay.subscribe(s => {
+    wins.textContent = s.victories;
+    goal.textContent = '/' + s.goal;
+  });
+</script>
+</body>
+</html>
