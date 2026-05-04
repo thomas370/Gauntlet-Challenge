@@ -16,6 +16,7 @@ console.log("[server] starting…");
 
 import { createServer } from "http";
 import { parse } from "url";
+import { resolve } from "path";
 import next from "next";
 import { Server as SocketIOServer, type Socket } from "socket.io";
 import {
@@ -57,7 +58,15 @@ function parseCookies(header: string): Record<string, string> {
 }
 
 // ── boot ────────────────────────────────────────────────────────────────────
-const app = next({ dev });
+// IMPORTANT : on force `dir` au dossier de server.ts plutôt que de laisser
+// Next utiliser process.cwd(). Sur AlwaysData (et la plupart des hosts gérés),
+// le process est parfois lancé depuis ~/ ou un cwd différent du dossier projet,
+// ce qui fait que Next ne trouve pas .next/static/* et renvoie 404 sur tous
+// les CSS/JS compilés. Avec `dir`, Next regarde toujours au bon endroit.
+const projectRoot = resolve(__dirname);
+console.log(`[server] projectRoot=${projectRoot} cwd=${process.cwd()}`);
+
+const app = next({ dev, dir: projectRoot });
 const handle = app.getRequestHandler();
 
 console.log("[server] calling app.prepare()…");
