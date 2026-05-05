@@ -2114,6 +2114,19 @@ body.shake { animation: none; }
   color: var(--text);
   font-weight: 500;
 }
+.overlay-links-row-size {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+  margin-top: 4px;
+  letter-spacing: 0.3px;
+  background: rgba(108, 181, 212, 0.1);
+  border: 1px solid rgba(108, 181, 212, 0.3);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
 .overlay-links-row-url {
   background: var(--bg-0);
   border: 1px solid var(--line);

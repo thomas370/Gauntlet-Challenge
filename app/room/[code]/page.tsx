@@ -1584,12 +1584,12 @@ export default function Page() {
 
  {/* === OVERLAYS MODAL === */}
  {showOverlays && (() => {
-   const widgets: { key: string; label: string; file: string }[] = [
-     { key: "total",    label: "Temps total",   file: "total-time.html" },
-     { key: "wins",     label: "Victoires",     file: "victories.html" },
-     { key: "resets",   label: "Resets",        file: "resets.html" },
-     { key: "current",  label: "Jeu en cours",  file: "current-game.html" },
-     { key: "list",     label: "Liste des jeux", file: "game-list.html" },
+   const widgets: { key: string; label: string; file: string; size: string }[] = [
+     { key: "total",    label: "Temps total",    file: "total-time.html",   size: "320 × 140" },
+     { key: "wins",     label: "Victoires",      file: "victories.html",    size: "320 × 140" },
+     { key: "resets",   label: "Resets",         file: "resets.html",       size: "320 × 140" },
+     { key: "current",  label: "Jeu en cours",   file: "current-game.html", size: "320 × 170" },
+     { key: "list",     label: "Liste des jeux", file: "game-list.html",    size: "400 × 730" },
    ];
    const origin = typeof window !== "undefined" ? window.location.origin : "";
    const buildUrl = (file: string) =>
@@ -1626,7 +1626,10 @@ export default function Page() {
                const copied = overlayCopied === w.key;
                return (
                  <div key={w.key} className="overlay-links-row">
-                   <div className="overlay-links-row-label">{w.label}</div>
+                   <div className="overlay-links-row-label">
+                     {w.label}
+                     <div className="overlay-links-row-size" title="Résolution OBS recommandée (largeur × hauteur en px)">{w.size}</div>
+                   </div>
                    <input className="overlay-links-row-url" type="text" value={url} readOnly onFocus={(e) => e.currentTarget.select()} />
                    <button
                      className={`overlay-links-row-copy${copied ? " copied" : ""}`}
