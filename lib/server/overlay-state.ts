@@ -14,6 +14,7 @@ export interface OverlayGame {
   player: string;
   duration: number;
   status: OverlayGameStatus;
+  coverUrl: string | null;
 }
 
 export interface OverlayState {
@@ -40,6 +41,10 @@ export function mapToOverlay(
 
   const games: OverlayGame[] = state.run.map((id, idx) => {
     const g = POOL_BY_ID.get(id);
+    // Same-origin proxy for Steam art — see app/api/steam/cover/[appid]/route.ts
+    // for why we don't hotlink the Steam CDN directly.
+    const coverUrl =
+      g?.cover ?? (g?.appid ? `/api/steam/cover/${g.appid}` : null);
     return {
       id,
       name: g?.name ?? `Game ${id}`,
@@ -50,6 +55,7 @@ export function mapToOverlay(
         : idx === state.current
           ? "current"
           : "upcoming",
+      coverUrl,
     };
   });
 
