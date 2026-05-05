@@ -15,6 +15,7 @@ import { DEFAULT_STATE, type GauntletState } from "@shared/types";
 import type { SteamSessionUser } from "@shared/types/steam";
 import type { RoomEvent, RoomMember, RoomSnapshot } from "@shared/types/room";
 import { mapToOverlay, type OverlayState } from "./overlay-state";
+import { recordRun } from "./db";
 
 const MAX_MEMBERS = 8;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // 12h since last activity (active rooms)
@@ -355,6 +356,17 @@ export function mutateState(
   const runRunning = next.runStartTime !== null;
   const now = Date.now();
 
+  // History entries appended in this mutation — these are the runs to persist.
+  // Capture durations BEFORE the runStartTime-reset block below clears them, so
+  // a single mutation that both completes a run and resets state still ends up
+  // with the right per-game timing for the row we write.
+  const newHistoryEntries =
+    next.history.length > prev.history.length
+      ? next.history.slice(prev.history.length)
+      : [];
+  const persistedDurations: Record<number, number> | null =
+    newHistoryEntries.length > 0 ? { ...r.gameDurations } : null;
+
   // A new run started (or run was reset) → drop stale per-game durations.
   if (next.runStartTime !== prev.runStartTime) {
     r.gameDurations = {};
@@ -368,10 +380,11 @@ export function mutateState(
   for (const id of next.done) {
     if (prevDone.has(id)) continue;
     if (id === prevGameId && r.currentGameStartedAt !== null) {
-      r.gameDurations[id] = Math.max(
-        1,
-        Math.floor((now - r.currentGameStartedAt) / 1000),
-      );
+      const dur = Math.max(1, Math.floor((now - r.currentGameStartedAt) / 1000));
+      r.gameDurations[id] = dur;
+      // Mirror into the persisted snapshot so the final game's time is included
+      // even when run-end and timing-capture happen in the same mutation.
+      if (persistedDurations) persistedDurations[id] = dur;
     }
   }
 
@@ -385,6 +398,19 @@ export function mutateState(
   touch(r);
   broadcast(r, { type: "state", state: next });
   broadcastOverlay(r);
+
+  if (persistedDurations) {
+    const members = Array.from(r.members.values());
+    for (const entry of newHistoryEntries) {
+      recordRun({
+        roomCode: r.code,
+        entry,
+        members,
+        gameDurations: persistedDurations,
+      });
+    }
+  }
+
   return snapshot(r);
 }
 

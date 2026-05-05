@@ -13,4 +13,6 @@ export const env = {
   JWT_SECRET: required("JWT_SECRET"),
   // Chemin (relatif au cwd backend/) du build static frontend que Express sert.
   FRONTEND_DIST: process.env.FRONTEND_DIST || "../frontend/out",
+  // SQLite DB file. Created on first open. Must be writable by the Node process.
+  DB_PATH: process.env.DB_PATH || "./data/gauntlet.sqlite",
 };

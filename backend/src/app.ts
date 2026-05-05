@@ -13,6 +13,7 @@ import pairRoutes from "./routes/pair";
 import roomRoutes from "./routes/room";
 import steamRoutes from "./routes/steam";
 import overlayRoutes from "./routes/overlay";
+import statsRoutes from "./routes/stats";
 
 export function createApp(): Express {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp(): Express {
   app.use("/api/room", roomRoutes);
   app.use("/api/steam", steamRoutes);
   app.use("/api/overlay", overlayRoutes);
+  app.use("/api/stats", statsRoutes);
 
   // === Static frontend ===
   // `next build` (output: 'export') → frontend/out/ contient l'app statique.

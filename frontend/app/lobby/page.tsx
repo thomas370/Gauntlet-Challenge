@@ -125,6 +125,14 @@ export default function LobbyPage() {
           </div>
         </div>
 
+        <div className="lobby-quick-links">
+          <a href={`/u?id=${user.steamId}`}>Mon profil</a>
+          <span aria-hidden>·</span>
+          <a href="/leaderboards/">Classements</a>
+          <span aria-hidden>·</span>
+          <a href="/games/">Stats par jeu</a>
+        </div>
+
         <h1 className="auth-title">Salon</h1>
 
         <button className="auth-btn" disabled={busy} onClick={createRoom}>

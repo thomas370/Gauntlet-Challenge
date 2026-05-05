@@ -5,6 +5,7 @@ import "dotenv/config";
 import { createServer } from "http";
 import { createApp } from "./app";
 import { attachSocketIO } from "./socket";
+import { closeDb, getDb } from "./lib/db";
 
 process.on("uncaughtException", (err) => {
   console.error("[server] uncaughtException:", err);
@@ -19,6 +20,11 @@ const port = parseInt(process.env.PORT ?? "3000", 10);
 const dev = process.env.NODE_ENV !== "production";
 
 console.log(`[server] starting (mode=${dev ? "dev" : "prod"} port=${port})`);
+
+// Open SQLite + apply migrations before the server accepts traffic. Failing
+// fast here is the right call: a broken DB means no run history can be saved,
+// and we'd rather know on boot than silently lose runs.
+getDb();
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -41,7 +47,9 @@ const shutdown = (signal: string): void => {
     else console.log("[server] HTTP server closed");
   });
   io.close(() => {
-    console.log("[server] socket.io closed, exiting");
+    console.log("[server] socket.io closed");
+    closeDb();
+    console.log("[server] db closed, exiting");
     process.exit(0);
   });
   setTimeout(() => {

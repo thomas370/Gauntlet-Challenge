@@ -37,6 +37,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   user: (<><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>),
   list: (<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>),
   info: (<><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>),
+  barChart: (<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></>),
 };
 function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number; fill?: string }) {
   const path = ICON_PATHS[name];
@@ -986,6 +987,16 @@ function RoomPageInner() {
  <div className="steam-link linked">
  <img src={member.avatarUrl} alt="" className="steam-link-avatar" />
  <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
+ <a
+   className="steam-link-stats"
+   href={`/u?id=${member.steamId}`}
+   target="_blank"
+   rel="noreferrer"
+   title="Voir les stats du joueur"
+   aria-label="Voir les stats du joueur"
+ >
+   <Icon name="barChart" size={14} />
+ </a>
  </div>
  ) : (
  <div className="steam-link empty">
@@ -1144,6 +1155,46 @@ function RoomPageInner() {
  </div>
  </div>
  </>
+ )}
+
+ {/* Players panel while a run is in progress (config panel is hidden). Mirrors
+     the Configuration panel's player-slot layout so positions are recognisable. */}
+ {runLocked && (
+ <div className="panel">
+ <h2>
+   <span className="panel-title">Joueurs</span>
+ </h2>
+ <div className="setup-grid">
+ {[0, 1, 2].map((i) => {
+ const member = members[i];
+ return (
+ <div className="field"key={i}>
+ <label>Joueur {i + 1}</label>
+ {member ? (
+ <div className="steam-link linked">
+ <img src={member.avatarUrl} alt="" className="steam-link-avatar" />
+ <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
+ <a
+   className="steam-link-stats"
+   href={`/u?id=${member.steamId}`}
+   target="_blank"
+   rel="noreferrer"
+   title="Voir les stats du joueur"
+   aria-label="Voir les stats du joueur"
+ >
+   <Icon name="barChart" size={14} />
+ </a>
+ </div>
+ ) : (
+ <div className="steam-link empty">
+ <span className="steam-link-name">En attente…</span>
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
+ </div>
  )}
 
  {/* RUN */}
