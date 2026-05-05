@@ -1,0 +1,101 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  background: transparent;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color: #fff;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+body { padding: 12px; }
+
+.card {
+  background: linear-gradient(160deg, #15161d 0%, #0f1015 100%);
+  border-radius: 16px;
+  padding: 18px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255,255,255,0.02) inset;
+  width: 100%;
+  max-width: 280px;
+}
+
+.card.accent-blue   { border-color: rgba(96, 165, 250, 0.35); }
+.card.accent-green  { border-color: rgba(74, 222, 128, 0.35); }
+.card.accent-red    { border-color: rgba(248, 113, 113, 0.4); }
+.card.gradient-purple {
+  background: linear-gradient(135deg, #6d28d9 0%, #c026d3 100%);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 8px 28px rgba(124, 58, 237, 0.45);
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-bottom: 8px;
+}
+
+.icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+.value {
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.value.blue   { color: #60a5fa; }
+.value.green  { color: #4ade80; }
+.value.red    { color: #f87171; }
+.value.amber  { color: #fbbf24; }
+
+.value .suffix {
+  font-size: 22px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: 4px;
+}
+
+.game-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin-bottom: 4px;
+}
+
+.player-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px;
+  opacity: 0.85;
+  margin-bottom: 8px;
+}
+
+.timer-pill {
+  display: inline-block;
+  background: rgba(0,0,0,0.35);
+  color: #fbbf24;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-weight: 700;
+  font-size: 18px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  letter-spacing: 1px;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.live-dot {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: #60a5fa;
+  animation: pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 8px #60a5fa;
+}

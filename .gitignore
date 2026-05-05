@@ -1,0 +1,15 @@
+node_modules/
+.DS_Store
+*.tsbuildinfo
+
+# Frontend artifacts
+frontend/.next/
+frontend/out/
+frontend/next-env.d.ts
+
+# Backend artifacts
+backend/dist/
+
+# Env (jamais committé — utiliser .env.example)
+.env
+.env*.local

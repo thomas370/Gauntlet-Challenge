@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>En cours</title>
+<link rel="stylesheet" href="/overlays/css/shared.css">
+<style>
+  .empty { opacity: 0.6; font-style: italic; font-size: 14px; }
+
+  /* Cover-art mode — side-by-side: portrait thumbnail on the left, text on
+     the right. Both Steam library_600x900 and our local covers are 2:3
+     portrait, so the thumbnail displays them cleanly without odd cropping. */
+  .card.has-cover {
+    max-width: 360px;
+    padding: 12px;
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+    background: linear-gradient(160deg, #1a1c25 0%, #0f1015 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+  }
+  .cover-thumb {
+    flex-shrink: 0;
+    width: 80px;
+    background-color: #0f1015;
+    background-size: cover;
+    background-position: center;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
+  .card.has-cover .card-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+  }
+  .card.has-cover .card-header { margin-bottom: 4px; }
+  .card.has-cover .game-name {
+    margin-bottom: 0;
+    /* Allow truncation when the name is long to keep layout stable. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card.has-cover .player-row { margin-bottom: 4px; }
+  .card.has-cover .timer-pill { align-self: flex-start; }
+</style>
+</head>
+<body>
+  <div class="card gradient-purple" id="card">
+    <div class="cover-thumb" id="thumb" hidden></div>
+    <div class="card-body" id="body">
+      <div class="card-header">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/>
+          <line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/>
+          <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258A4 4 0 0 0 17.32 5z"/>
+        </svg>
+        <span>En cours</span>
+      </div>
+      <div id="content">
+        <div class="empty">Aucun jeu sélectionné</div>
+      </div>
+    </div>
+  </div>
+
+<script src="/overlays/js/time.js"></script>
+<script src="/overlays/js/client.js"></script>
+<script>
+  const card = document.getElementById('card');
+  const thumb = document.getElementById('thumb');
+  const content = document.getElementById('content');
+  let currentGame = null;
+  let currentCoverUrl = null;
+
+  function applyCover(url) {
+    if (url === currentCoverUrl) return;
+    currentCoverUrl = url;
+
+    if (!url) {
+      thumb.hidden = true;
+      thumb.style.backgroundImage = '';
+      card.classList.remove('has-cover');
+      card.classList.add('gradient-purple');
+      return;
+    }
+
+    card.classList.remove('gradient-purple');
+    card.classList.add('has-cover');
+    thumb.hidden = false;
+    thumb.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
+  }
+
+  function render() {
+    const s = window.Overlay.state;
+    if (!s) return;
+    const g = s.games.find(x => x.id === s.currentGameId);
+    currentGame = g;
+    if (!g) {
+      applyCover(null);
+      content.innerHTML = '<div class="empty">Aucun jeu sélectionné</div>';
+      return;
+    }
+    applyCover(g.coverUrl || null);
+    content.innerHTML = `
+      <div class="game-name">${escapeHtml(g.name)}</div>
+      <div class="player-row">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>${escapeHtml(g.player)}</span>
+      </div>
+      <div class="timer-pill" id="timer">00:00:00</div>
+    `;
+  }
+
+  function tick() {
+    const s = window.Overlay.state;
+    if (!s || !currentGame) return;
+    const t = document.getElementById('timer');
+    if (t) t.textContent = fmtHMS(liveCurrentMs(s));
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  window.Overlay.subscribe(render);
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
