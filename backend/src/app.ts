@@ -37,6 +37,13 @@ export function createApp(): Express {
   // FRONTEND_DIST est résolu depuis backend/ par défaut → ../frontend/out
   const frontendDist = path.resolve(process.cwd(), env.FRONTEND_DIST);
 
+  // / n'a pas de page Next (le tracker solo a été supprimé) — on redirige
+  // vers /lobby/. Doit passer avant express.static sinon il essaie de servir
+  // un index.html qui n'existe pas.
+  app.get("/", (_req, res) => {
+    res.redirect("/lobby/");
+  });
+
   app.use(
     express.static(frontendDist, {
       index: "index.html",
@@ -49,15 +56,13 @@ export function createApp(): Express {
     }),
   );
 
-  // SPA fallback — on retombe sur l'index.html si la route n'existe pas.
-  // Les routes /api/* qui ne matchent rien retournent 404 normal.
+  // Fallback pour les routes GET inconnues — on renvoie sur /lobby/ plutôt
+  // que de 404. Les /api/* qui ne matchent rien retournent 404 normal.
   app.use((req, res, next) => {
     if (req.method !== "GET") return next();
     if (req.path.startsWith("/api/")) return next();
     if (req.path.startsWith("/socket.io/")) return next();
-    res.sendFile(path.join(frontendDist, "index.html"), (err) => {
-      if (err) next();
-    });
+    res.redirect("/lobby/");
   });
 
   // === Error handler ===

@@ -9,7 +9,7 @@ Monorepo, frontend statique + backend Node.js déployés sur la **même origine*
 ```
 gauntlet-challenge/
   frontend/        # Next.js 14 — static export → frontend/out/
-    app/           # / (solo), /lobby, /login, /pair, /room (?code=)
+    app/           # /lobby, /login, /pair, /room (?code=) — / redirige vers /lobby
     lib/           # types, games, hooks client, socket.io-client
     public/        # covers/ + overlays/ Twitch
   backend/         # Express + Socket.io
@@ -100,7 +100,7 @@ npm --workspace frontend run build
 
 10 jeux tirés aléatoirement, le but est de tous les enchaîner sans perdre. Pénalité au choix : reset complet ou recule d'un jeu. Difficulté Normal ou Hardcore. Sélection de 0-5 jeux épinglés, le reste tiré aléatoirement dans le pool de 80.
 
-- `/` — tracker solo (state localStorage, aucun backend requis)
+- `/` → redirige vers `/lobby`
 - `/login` → OAuth Steam
 - `/lobby` → créer / rejoindre une room
 - `/room?code=XXXXXX` → page de jeu multijoueur (Socket.io sync)
