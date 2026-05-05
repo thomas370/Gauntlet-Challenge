@@ -1589,7 +1589,7 @@ export default function Page() {
      { key: "wins",     label: "Victoires",      file: "victories.html",    size: "320 × 140" },
      { key: "resets",   label: "Resets",         file: "resets.html",       size: "320 × 140" },
      { key: "current",  label: "Jeu en cours",   file: "current-game.html", size: "400 × 180" },
-     { key: "list",     label: "Liste des jeux", file: "game-list.html",    size: "400 × 730" },
+     { key: "list",     label: "Liste des jeux", file: "game-list.html",    size: "400 × 950" },
    ];
    const origin = typeof window !== "undefined" ? window.location.origin : "";
    const buildUrl = (file: string) =>

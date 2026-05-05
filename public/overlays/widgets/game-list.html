@@ -18,7 +18,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 8px 12px;
     background: linear-gradient(135deg, #1b1c25 0%, #14151c 100%);
     border-radius: 10px;
     border: 1px solid rgba(255,255,255,0.04);
@@ -75,6 +75,60 @@
     box-shadow: 0 0 10px rgba(59, 130, 246, 0.6);
   }
   .badge svg { width: 16px; height: 16px; }
+
+  /* Cover-art thumbnail — replaces the round badge when a game has artwork.
+     Status (completed / current) is shown via border + a small corner badge. */
+  .cover-thumb {
+    flex-shrink: 0;
+    width: 40px;
+    height: 60px;
+    border-radius: 5px;
+    background-color: rgba(0,0,0,0.4);
+    background-size: cover;
+    background-position: center;
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    position: relative;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .game-row.completed .cover-thumb {
+    border-color: rgba(34, 197, 94, 0.7);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.25);
+  }
+  .game-row.current .cover-thumb {
+    border-color: rgba(96, 165, 250, 0.85);
+    box-shadow: 0 0 14px rgba(59, 130, 246, 0.5);
+  }
+  .game-row.just-completed .cover-thumb {
+    animation: badgePop 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Small status pill anchored to the bottom-right of the cover. */
+  .cover-status {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    background: #2a2e36;
+    color: rgba(255,255,255,0.85);
+    border: 2px solid #14151c;
+  }
+  .game-row.completed .cover-status {
+    background: #22c55e;
+    color: #052e14;
+  }
+  .game-row.current .cover-status {
+    background: #3b82f6;
+    color: #fff;
+  }
+  .cover-status svg { width: 10px; height: 10px; }
 
   .info {
     flex: 1;
@@ -164,9 +218,9 @@
 
     list.innerHTML = s.games.map((g, i) => {
       const num = i + 1;
-      let badgeContent = num;
-      if (g.status === 'completed') badgeContent = checkIcon;
-      else if (g.status === 'current') badgeContent = padIcon;
+      let statusContent = String(num);
+      if (g.status === 'completed') statusContent = checkIcon;
+      else if (g.status === 'current') statusContent = padIcon;
 
       let timeBlock = '';
       if (g.status === 'completed') {
@@ -177,9 +231,15 @@
 
       const liveDot = g.status === 'current' ? '<div class="live-indicator"></div>' : '';
 
+      // Prefer cover thumbnail when available; fall back to the round badge
+      // for games without any artwork (none in the current pool, but defensive).
+      const leftSlot = g.coverUrl
+        ? `<div class="cover-thumb" style="background-image: url('${String(g.coverUrl).replace(/'/g, '%27')}')"><div class="cover-status">${statusContent}</div></div>`
+        : `<div class="badge">${statusContent}</div>`;
+
       return `
         <div class="game-row ${g.status}" data-id="${g.id}">
-          <div class="badge">${badgeContent}</div>
+          ${leftSlot}
           <div class="info">
             <div class="row-name">${escapeHtml(g.name)}</div>
             <div class="row-player">${userIcon}<span>${escapeHtml(g.player)}</span></div>
