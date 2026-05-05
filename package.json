@@ -2,28 +2,17 @@
   "name": "gauntlet-challenge",
   "version": "1.0.0",
   "private": true,
+  "description": "Monorepo: frontend (Next.js static export) + backend (Express + Socket.io). Same-origin deployment on Alwaysdata.",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
-    "dev": "tsx --tsconfig tsconfig.server.json server.ts",
-    "build": "next build",
-    "start": "NODE_ENV=production tsx --tsconfig tsconfig.server.json server.ts",
-    "lint": "next lint"
-  },
-  "dependencies": {
-    "fast-xml-parser": "^5.7.2",
-    "jsonwebtoken": "^9.0.3",
-    "next": "^14.2.35",
-    "node-cache": "^5.1.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "socket.io": "^4.8.3",
-    "socket.io-client": "^4.8.3",
-    "tsx": "^4.21.0"
-  },
-  "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^20.14.10",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "typescript": "^5.5.3"
+    "install:all": "npm install --workspace frontend --workspace backend",
+    "build": "npm --workspace frontend run build",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "start": "npm --workspace backend run start",
+    "typecheck": "npm --workspace backend run typecheck"
   }
 }
