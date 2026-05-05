@@ -8,7 +8,14 @@ import { SESSION_COOKIE } from "@/lib/session-cookie";
 // /api/overlay/ is the read-only SSE feed for Twitch overlays. OBS browser
 // sources can't send the Steam session cookie, so the room code embedded in
 // the URL is the only access control needed.
-const PUBLIC_API_PREFIXES = ["/api/auth/", "/socket.io/", "/api/overlay/"];
+// /api/steam/cover/ is the public Steam-art proxy used by overlay widgets;
+// it only proxies public CDN images keyed by numeric appid.
+const PUBLIC_API_PREFIXES = [
+  "/api/auth/",
+  "/socket.io/",
+  "/api/overlay/",
+  "/api/steam/cover/",
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
