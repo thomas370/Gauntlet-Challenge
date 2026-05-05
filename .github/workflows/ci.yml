@@ -7,6 +7,14 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      STEAM_API_KEY: ${{ secrets.STEAM_API_KEY }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      STEAM_REALM: ${{ secrets.STEAM_REALM }}
+      STEAM_RETURN_URL: ${{ secrets.STEAM_RETURN_URL }}
+      FRONTEND_URL: ${{ secrets.FRONTEND_URL }}
+      NODE_ENV: ${{ secrets.NODE_ENV }}
+      
 
     steps:
       - name: Checkout code
