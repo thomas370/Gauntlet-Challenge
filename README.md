@@ -106,4 +106,3 @@ npm --workspace frontend run build
 - `/room?code=XXXXXX` → page de jeu multijoueur (Socket.io sync)
 - `/pair` → flow de pairing pour ajouter d'autres joueurs sur la même machine
 - Overlays Twitch : `/overlays/widgets/<widget>.html?token=<jwt>` (token issu de `/api/me/overlay-token`)
-# Gauntlet-Challenge

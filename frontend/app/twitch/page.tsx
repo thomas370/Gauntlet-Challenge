@@ -227,7 +227,7 @@ function ActivityRow({ ev }: { ev: TwitchEvent }) {
   const time = new Date(ev.receivedAt).toLocaleTimeString("fr-FR");
   const sourceIcon = ev.source === "bits" ? "💎" : "★";
   const failLabel = ev.failReason
-    ? (FAIL_REASON_LABEL[ev.failReason] ?? ev.failReason.startsWith("underfunded_") ? `Sous-financé (besoin ${ev.failReason.split("_").pop()} bits)` : ev.failReason)
+    ? (FAIL_REASON_LABEL[ev.failReason] ?? (ev.failReason.startsWith("underfunded_") ? `Sous-financé (besoin ${ev.failReason.split("_").pop()} bits)` : ev.failReason))
     : null;
   return (
     <li className={`twitch-activity-row ${ev.applied ? "applied" : "failed"}`}>

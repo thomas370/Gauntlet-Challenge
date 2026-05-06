@@ -25,6 +25,7 @@ import {
   getStatus as getEventSubStatus,
 } from "../lib/twitch-eventsub";
 import { EFFECTS, EFFECT_KEYS } from "../lib/twitch-effects";
+import { broadcastMembersForUser } from "../lib/room-store";
 
 const router = Router();
 
@@ -134,6 +135,7 @@ router.get("/auth/callback", async (req, res) => {
     void ensureRewards(user.id, state.steamId).then((r) => {
       if (!r.ok) console.warn(`[twitch] ensureRewards on connect failed: ${r.reason} ${r.detail ?? ""}`);
     });
+    broadcastMembersForUser(state.steamId);
     res.redirect("/twitch/?connected=1");
   } catch (err) {
     const msg = err instanceof Error ? err.message : "exchange_failed";
@@ -157,6 +159,7 @@ router.post("/auth/disconnect", requireAuth, async (req, res) => {
     });
     deleteEventsForBroadcaster(link.broadcasterId);
     deleteLink(req.user!.steamId);
+    broadcastMembersForUser(req.user!.steamId);
   }
   res.json({ ok: true });
 });

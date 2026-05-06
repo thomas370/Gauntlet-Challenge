@@ -7,6 +7,31 @@ export interface SteamSessionUser {
   profileUrl: string;
 }
 
+/** Guest sessions reuse SteamSessionUser; their `steamId` is prefixed with `g_`
+ *  so callers can short-circuit Steam-only features (ownership lookup, profile
+ *  page, etc.) without changing the session shape. */
+export const GUEST_ID_PREFIX = "g_";
+
+export function isGuestId(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(GUEST_ID_PREFIX);
+}
+
+/** Bot members are added by humans for testing or for filling out a draw when
+ *  there aren't enough real players. They have no session, no Steam library,
+ *  no profile — just a synthetic id and a chosen display name. */
+export const BOT_ID_PREFIX = "bot_";
+
+export function isBotId(id: string | null | undefined): boolean {
+  return typeof id === "string" && id.startsWith(BOT_ID_PREFIX);
+}
+
+/** Convenience: true for any non-Steam id (guest or bot). Use this when the
+ *  decision is "do we have a real Steam profile to query?" rather than "is this
+ *  a real human?". */
+export function isSyntheticId(id: string | null | undefined): boolean {
+  return isGuestId(id) || isBotId(id);
+}
+
 export type CommunityVisibility = 1 | 2 | 3; // 1/2 = private/friends, 3 = public
 
 export interface SteamPlayerSummary {

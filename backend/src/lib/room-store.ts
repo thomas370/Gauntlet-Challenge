@@ -11,11 +11,13 @@
 // On every state or membership mutation we re-broadcast to all subscribers. Each
 // subscriber is also detached automatically when its underlying response is closed.
 
+import crypto from "crypto";
 import { DEFAULT_STATE, type GauntletState } from "@shared/types";
-import type { SteamSessionUser } from "@shared/types/steam";
+import { BOT_ID_PREFIX, isBotId, type SteamSessionUser } from "@shared/types/steam";
 import type { RoomEvent, RoomMember, RoomSnapshot } from "@shared/types/room";
 import { mapToOverlay, type OverlayState } from "./overlay-state";
 import { recordRun } from "./db";
+import { getLinkBySteamId } from "./twitch-store";
 
 const MAX_MEMBERS = 8;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // 12h since last activity (active rooms)
@@ -122,11 +124,23 @@ if (!ggc._roomGcInterval) {
   ggc._roomGcInterval.unref?.();
 }
 
+function enrichMember(m: RoomMember): RoomMember {
+  const link = getLinkBySteamId(m.steamId);
+  return {
+    ...m,
+    twitch: link ? { login: link.login, displayName: link.displayName } : null,
+  };
+}
+
+function snapshotMembers(r: Room): RoomMember[] {
+  return Array.from(r.members.values()).map(enrichMember);
+}
+
 function snapshot(r: Room): RoomSnapshot {
   return {
     code: r.code,
     ownerSteamId: r.ownerSteamId,
-    members: Array.from(r.members.values()),
+    members: snapshotMembers(r),
     state: r.state,
     createdAt: r.createdAt,
   };
@@ -182,6 +196,99 @@ function findUserRoom(steamId: string): Room | null {
 /** Public lookup: room code of a user's most recently active room, or null. */
 export function findUserRoomCode(steamId: string): string | null {
   return findUserRoom(steamId)?.code ?? null;
+}
+
+/**
+ * Re-broadcast the members list for any rooms `steamId` is in. Called by the
+ * Twitch routes after connect/disconnect so other members see the indicator
+ * change without needing to refresh.
+ */
+export function broadcastMembersForUser(steamId: string): void {
+  rooms.forEach((r) => {
+    if (!r.members.has(steamId)) return;
+    broadcast(r, { type: "members", members: snapshotMembers(r) });
+  });
+}
+
+const BOT_NAME_MIN = 1;
+const BOT_NAME_MAX = 24;
+
+function sanitizeBotName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const code = raw.charCodeAt(i);
+    if (code < 32 || code === 127) continue;
+    out += raw[i];
+  }
+  const cleaned = out.replace(/\s+/g, " ").trim();
+  if (cleaned.length < BOT_NAME_MIN || cleaned.length > BOT_NAME_MAX) return null;
+  return cleaned;
+}
+
+function generateBotId(): string {
+  return `${BOT_ID_PREFIX}${crypto.randomBytes(6).toString("hex")}`;
+}
+
+function botAvatar(name: string): string {
+  const initial = (name.match(/[\p{L}\p{N}]/u)?.[0] ?? "B").toUpperCase();
+  // Slate-grey background to visually distinguish bots from human guest avatars
+  // (which use a hue derived from the name).
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="184" height="184" viewBox="0 0 184 184">` +
+    `<rect width="184" height="184" fill="#3a4150"/>` +
+    `<text x="92" y="120" font-family="sans-serif" font-size="96" font-weight="700" text-anchor="middle" fill="#cbd5e1">${initial}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Add a synthetic bot member to `code`. Any human member of the room may add a
+ * bot — there's no owner-only gate, since bots are convenience for filling out
+ * draws, not a privileged operation.
+ */
+export function addBot(
+  code: string,
+  requesterSteamId: string,
+  name: string,
+): { bot: RoomMember } | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(requesterSteamId)) return { error: "Pas membre de cette room" };
+  if (r.members.size >= MAX_MEMBERS) return { error: "Room pleine" };
+  const cleanName = sanitizeBotName(name);
+  if (!cleanName) return { error: "Nom de bot invalide" };
+  const botId = generateBotId();
+  const bot: RoomMember = {
+    steamId: botId,
+    displayName: cleanName,
+    avatarUrl: botAvatar(cleanName),
+    profileUrl: "",
+    joinedAt: Date.now(),
+  };
+  r.members.set(botId, bot);
+  touch(r);
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
+  return { bot };
+}
+
+/**
+ * Remove a bot from `code`. Any human member can do this; non-bot ids are
+ * rejected so this can't be used to kick a real player.
+ */
+export function removeBot(
+  code: string,
+  requesterSteamId: string,
+  botSteamId: string,
+): { ok: true } | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(requesterSteamId)) return { error: "Pas membre de cette room" };
+  if (!isBotId(botSteamId)) return { error: "Cible non bot" };
+  if (!r.members.delete(botSteamId)) return { error: "Bot introuvable" };
+  touch(r);
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
+  return { ok: true };
 }
 
 function rebindUserSub(sub: UserOverlaySub) {
@@ -251,7 +358,7 @@ export function joinRoom(code: string, user: SteamSessionUser): RoomSnapshot | {
   const member: RoomMember = { ...user, joinedAt: r.members.get(user.steamId)?.joinedAt ?? Date.now() };
   r.members.set(user.steamId, member);
   touch(r);
-  broadcast(r, { type: "members", members: Array.from(r.members.values()) });
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
   refreshUserOverlaySubs(user.steamId);
   return snapshot(r);
 }
@@ -276,6 +383,12 @@ function removeMember(code: string, steamId: string, deleteIfEmpty: boolean): bo
   }
   const had = r.members.delete(steamId);
   if (!had) return false;
+  // Bots can't subscribe or drive the room — once the last human is gone, drop
+  // any orphan bots so the empty-room handling kicks in normally.
+  const remainingHumans = Array.from(r.members.keys()).filter((id) => !isBotId(id));
+  if (remainingHumans.length === 0 && r.members.size > 0) {
+    r.members.clear();
+  }
   if (r.members.size === 0) {
     if (deleteIfEmpty) {
       clearPendingLeaves(r);
@@ -290,13 +403,14 @@ function removeMember(code: string, steamId: string, deleteIfEmpty: boolean): bo
     refreshUserOverlaySubs(steamId);
     return true;
   }
-  // Promote a new owner if the leaver was the owner.
+  // Promote a new owner if the leaver was the owner. Skip bots — they can't
+  // own rooms (no session, no subscribers).
   if (r.ownerSteamId === steamId) {
-    const next = r.members.values().next().value as RoomMember | undefined;
-    if (next) r.ownerSteamId = next.steamId;
+    const nextHuman = Array.from(r.members.values()).find((m) => !isBotId(m.steamId));
+    if (nextHuman) r.ownerSteamId = nextHuman.steamId;
   }
   touch(r);
-  broadcast(r, { type: "members", members: Array.from(r.members.values()) });
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
   refreshUserOverlaySubs(steamId);
   return true;
 }

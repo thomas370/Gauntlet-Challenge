@@ -267,6 +267,52 @@ html, body {
   border-color: rgba(108, 181, 212, 0.3);
   background: rgba(108, 181, 212, 0.08);
 }
+.steam-link-twitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: #9146ff;
+  flex-shrink: 0;
+}
+.steam-link.linked.bot {
+  border-color: rgba(203, 213, 225, 0.25);
+  border-style: dashed;
+}
+.steam-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(203, 213, 225, 0.12);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.steam-link-add-bot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.steam-link-add-bot:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 
 .steam-link-btn {
   background: transparent;
@@ -363,6 +409,39 @@ html, body {
 }
 .auth-btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-0); }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.auth-divider::before, .auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #2a2f38;
+}
+.auth-guest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.auth-guest-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.auth-guest-hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
 .lobby-card { gap: 16px; }
 .lobby-user {
   display: flex;
@@ -386,9 +465,23 @@ html, body {
   color: var(--text);
   font-weight: 600;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lobby-user-name > span:first-child {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+.lobby-user-twitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9146ff;
+  flex-shrink: 0;
 }
 .lobby-logout {
   background: transparent;
@@ -1442,6 +1535,26 @@ html, body {
   text-shadow: none;
 }
 .slot-machine.locked .slot-strip { animation: none; }
+.slot-sep {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+/* "&" tying two reels into a cooperating pair (tight, accent colour). */
+.slot-sep-and {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.85;
+}
+/* Middle dot separating one cooperating pair from the next (looser, muted). */
+.slot-sep-pair {
+  padding: 0 10px;
+  font-size: 16px;
+  color: var(--muted);
+}
 @keyframes bounceLock { 0%,100% { transform: translateY(0); } }
 
 /* ====== CONFETTI (canvas hidden visually but kept for layout) ====== */

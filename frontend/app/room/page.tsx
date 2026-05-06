@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { flushSync } from "react-dom";
 import { POOL, getCategories, effectiveMode } from "@/lib/games";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import { useRoom } from "@/lib/client/use-room";
 import { useMe } from "@/lib/client/use-me";
+import { isGuestId, isBotId, isSyntheticId } from "@/lib/types/steam";
 
 // === ICONS (Lucide-style inline SVG) ===
 const ICON_PATHS: Record<string, React.ReactNode> = {
@@ -38,6 +39,9 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   list: (<><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>),
   info: (<><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>),
   barChart: (<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="3" y1="20" x2="21" y2="20"/></>),
+  twitch: (<path d="M21 2H3v16h5v4l4-4h5l4-4V2zM11 11V7M16 11V7"/>),
+  bot: (<><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></>),
+  plus: (<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>),
 };
 function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number; fill?: string }) {
   const path = ICON_PATHS[name];
@@ -101,6 +105,20 @@ function fmtDate(ts: number): string {
  );
 }
 
+// Render a champion list. Solo gets a single name; duo games split the picks
+// into cooperating pairs of 2 ("A & B" for one duo, "A & B · C & D" for two
+// parallel duos, etc.). The two duos play the objective independently — they
+// aren't versus each other.
+function formatChampion(picks: string[], pairSize: number): string {
+ if (picks.length === 0) return "";
+ if (pairSize <= 1) return picks.join(" & ");
+ const pairs: string[] = [];
+ for (let i = 0; i < picks.length; i += pairSize) {
+   pairs.push(picks.slice(i, i + pairSize).join(" & "));
+ }
+ return pairs.join(" · ");
+}
+
 export default function Page() {
   // Static export ne supporte pas les segments dynamiques [code], on lit le code
   // depuis ?code=XXX. useSearchParams demande un Suspense boundary autour.
@@ -119,7 +137,7 @@ function RoomPageInner() {
  useEffect(() => {
    if (!roomCode) router.replace("/lobby");
  }, [roomCode, router]);
- const { state, setState, members, connected, closed } = useRoom(roomCode);
+ const { state, setState, members, connected, closed, addBot, removeBot } = useRoom(roomCode);
  const me = useMe();
  const hydrated = true;
  const [localSearch, setLocalSearch] = useState("");
@@ -130,6 +148,10 @@ function RoomPageInner() {
  reels: string[][];
  final: string[];
  locked: boolean[];
+ // Size of each cooperating pair. 1 for solo (no separators), 2 for duo
+ // (a "&" separator between every pair of reels). Duos are independent —
+ // they each tackle the objective on their own.
+ pairSize: number;
  } | null>(null);
  const [swappedIdx, setSwappedIdx] = useState<number | null>(null);
  const [shaking, setShaking] = useState(false);
@@ -182,6 +204,9 @@ function RoomPageInner() {
    .join(",");
  useEffect(() => {
    if (!me) return;
+   // Guests have no Steam library to query — leave ownership map empty so the
+   // chips render as "unknown" without burning an API round-trip per run.
+   if (isGuestId(me.steamId)) return;
    if (!runAppIdsKey) return;
    const runAppIds = runAppIdsKey.split(",").map(Number).filter((n) => Number.isFinite(n));
    if (runAppIds.length === 0) return;
@@ -431,6 +456,26 @@ function RoomPageInner() {
    router.push("/lobby");
  };
 
+ // Suggest the next available NATO-letter name so successive bots are easy to
+ // tell apart in the slot machine.
+ const nextDefaultBotName = (): string => {
+   const NATO = ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel"];
+   const taken = new Set(members.map((m) => m.displayName.trim()));
+   for (const w of NATO) {
+     const candidate = `Bot ${w}`;
+     if (!taken.has(candidate)) return candidate;
+   }
+   return `Bot ${members.length + 1}`;
+ };
+
+ const promptAddBot = () => {
+   const name = window.prompt("Nom du bot :", nextDefaultBotName());
+   if (name === null) return;
+   const trimmed = name.trim();
+   if (trimmed.length < 1) return;
+   addBot(trimmed);
+ };
+
  const copyRoomLink = async () => {
    const url = `${window.location.origin}/room/${roomCode}`;
    try {
@@ -641,20 +686,33 @@ function RoomPageInner() {
  }
  initAudio();
 
+ // Decide who's drawn and how the slots are partitioned.
+ //   solo:               1 player    → pairSize = 1, final.length = 1
+ //   duo with 2 players: 1 duo       → pairSize = 2, final.length = 2 (A & B)
+ //   duo with 4 players: 2 duos      → pairSize = 2, final.length = 4 (A & B · C & D)
+ //   duo with N players (N>=2):      → pairSize = 2, final.length = 2*floor(N/2)
+ // Duos are cooperating pairs running the objective independently — they're
+ // not opposing teams. Any leftover odd player is benched.
  let final: string[];
- if (mode === "duo" && players.length >= 2) {
- const sh = shuffle(players);
- final = [sh[0], sh[1]];
+ let pairSize: number;
+ if (mode === "duo") {
+ const numDuos = Math.max(1, Math.floor(players.length / 2));
+ const drawn = numDuos * 2;
+ final = shuffle(players).slice(0, drawn);
+ pairSize = 2;
  } else {
  final = [players[Math.floor(Math.random() * players.length)]];
+ pairSize = 1;
  }
 
  const reelCount = final.length;
- const cyclesPerReel = [10, 14, 18];
+ // Stagger the reels so each one finishes a beat after the previous; keeps the
+ // animation feeling weighty even when the draw expands to 6 reels (3v3).
+ const cyclesForReel = (r: number) => 10 + r * 4;
  const reels: string[][] = [];
  for (let r = 0; r < reelCount; r++) {
  const cells: string[] = [];
- const totalCells = cyclesPerReel[r] + 1;
+ const totalCells = cyclesForReel(r) + 1;
  for (let i = 0; i < totalCells; i++) {
  cells.push(i === totalCells - 1 ? final[r] : players[Math.floor(Math.random() * players.length)]);
  }
@@ -664,7 +722,7 @@ function RoomPageInner() {
  // Force-render the slot machine DOM before reading element refs
  flushSync(() => {
  setDrawingFor(gameId);
- setSlotData({ reels, final, locked: final.map(() => false) });
+ setSlotData({ reels, final, locked: final.map(() => false), pairSize });
  });
 
  const stripCellHeight = 32;
@@ -676,7 +734,7 @@ function RoomPageInner() {
  console.warn(`strip${r} not found in DOM`);
  return Promise.resolve();
  }
- const totalCells = cyclesPerReel[r] + 1;
+ const totalCells = cyclesForReel(r) + 1;
  const targetY = (totalCells - 1) * stripCellHeight;
  const duration = 1200 + r * 400;
  const start = performance.now();
@@ -711,7 +769,7 @@ function RoomPageInner() {
 
  Promise.all(promises).then(() => {
  setTimeout(() => {
- const finalName = mode === "duo" ? `${final[0]} & ${final[1]}` : final[0];
+ const finalName = formatChampion(final, pairSize);
  setState((s) => ({ ...s, champions: { ...s.champions, [gameId]: finalName } }));
  setDrawingFor(null);
  setSlotData(null);
@@ -912,6 +970,12 @@ function RoomPageInner() {
  const progressPct = state.run.length === 0 ? 0 : (state.done.length / state.run.length) * 100;
  // Lock config once a run is active (run generated + countdown done)
  const runLocked = state.run.length > 0;
+ // Player slots: every member + one waiting placeholder, with a minimum of 3
+ // (so an empty room still shows the familiar layout). Capped at the server's
+ // 8-member limit.
+ const MAX_MEMBERS = 8;
+ const slotCount = Math.min(MAX_MEMBERS, Math.max(3, members.length + 1));
+ const playerSlots = Array.from({ length: slotCount }, (_, i) => i);
 
  if (!hydrated) {
  return (
@@ -994,29 +1058,71 @@ function RoomPageInner() {
    <span className="panel-title"><span className="panel-section-num">1</span> Configuration</span>
  </h2>
  <div className="setup-grid">
- {[0, 1, 2].map((i) => {
+ {playerSlots.map((i) => {
  const member = members[i];
  return (
  <div className="field"key={i}>
  <label>Joueur {i + 1}</label>
  {member ? (
- <div className="steam-link linked">
+ <div className={`steam-link linked${isBotId(member.steamId) ? " bot" : ""}`}>
  <img src={member.avatarUrl} alt="" className="steam-link-avatar" />
- <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
- <a
-   className="steam-link-stats"
-   href={`/u?id=${member.steamId}`}
-   target="_blank"
-   rel="noreferrer"
-   title="Voir les stats du joueur"
-   aria-label="Voir les stats du joueur"
- >
-   <Icon name="barChart" size={14} />
- </a>
+ {isSyntheticId(member.steamId) ? (
+   <span className="steam-link-name" title={isBotId(member.steamId) ? "Bot local" : "Joueur invité"}>{member.displayName}</span>
+ ) : (
+   <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
+ )}
+ {isBotId(member.steamId) && (
+   <span className="steam-link-badge" title="Bot local">
+     <Icon name="bot" size={12} />
+     BOT
+   </span>
+ )}
+ {member.twitch && (
+   <span
+     className="steam-link-twitch"
+     title={`Twitch connecté : ${member.twitch.displayName}`}
+     aria-label={`Twitch connecté : ${member.twitch.displayName}`}
+   >
+     <Icon name="twitch" size={14} />
+   </span>
+ )}
+ {!isSyntheticId(member.steamId) && (
+   <a
+     className="steam-link-stats"
+     href={`/u?id=${member.steamId}`}
+     target="_blank"
+     rel="noreferrer"
+     title="Voir les stats du joueur"
+     aria-label="Voir les stats du joueur"
+   >
+     <Icon name="barChart" size={14} />
+   </a>
+ )}
+ {isBotId(member.steamId) && !runLocked && (
+   <button
+     type="button"
+     className="steam-link-stats"
+     onClick={() => removeBot(member.steamId)}
+     title="Retirer ce bot"
+     aria-label="Retirer ce bot"
+   >
+     <Icon name="x" size={14} />
+   </button>
+ )}
  </div>
  ) : (
  <div className="steam-link empty">
  <span className="steam-link-name">En attente…</span>
+ {!runLocked && (
+   <button
+     type="button"
+     className="steam-link-add-bot"
+     onClick={promptAddBot}
+     title="Ajouter un bot pour ce slot"
+   >
+     <Icon name="plus" size={11} /> Bot
+   </button>
+ )}
  </div>
  )}
  </div>
@@ -1181,29 +1287,71 @@ function RoomPageInner() {
    <span className="panel-title">Joueurs</span>
  </h2>
  <div className="setup-grid">
- {[0, 1, 2].map((i) => {
+ {playerSlots.map((i) => {
  const member = members[i];
  return (
  <div className="field"key={i}>
  <label>Joueur {i + 1}</label>
  {member ? (
- <div className="steam-link linked">
+ <div className={`steam-link linked${isBotId(member.steamId) ? " bot" : ""}`}>
  <img src={member.avatarUrl} alt="" className="steam-link-avatar" />
- <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
- <a
-   className="steam-link-stats"
-   href={`/u?id=${member.steamId}`}
-   target="_blank"
-   rel="noreferrer"
-   title="Voir les stats du joueur"
-   aria-label="Voir les stats du joueur"
- >
-   <Icon name="barChart" size={14} />
- </a>
+ {isSyntheticId(member.steamId) ? (
+   <span className="steam-link-name" title={isBotId(member.steamId) ? "Bot local" : "Joueur invité"}>{member.displayName}</span>
+ ) : (
+   <a className="steam-link-name" href={member.profileUrl} target="_blank" rel="noreferrer">{member.displayName}</a>
+ )}
+ {isBotId(member.steamId) && (
+   <span className="steam-link-badge" title="Bot local">
+     <Icon name="bot" size={12} />
+     BOT
+   </span>
+ )}
+ {member.twitch && (
+   <span
+     className="steam-link-twitch"
+     title={`Twitch connecté : ${member.twitch.displayName}`}
+     aria-label={`Twitch connecté : ${member.twitch.displayName}`}
+   >
+     <Icon name="twitch" size={14} />
+   </span>
+ )}
+ {!isSyntheticId(member.steamId) && (
+   <a
+     className="steam-link-stats"
+     href={`/u?id=${member.steamId}`}
+     target="_blank"
+     rel="noreferrer"
+     title="Voir les stats du joueur"
+     aria-label="Voir les stats du joueur"
+   >
+     <Icon name="barChart" size={14} />
+   </a>
+ )}
+ {isBotId(member.steamId) && !runLocked && (
+   <button
+     type="button"
+     className="steam-link-stats"
+     onClick={() => removeBot(member.steamId)}
+     title="Retirer ce bot"
+     aria-label="Retirer ce bot"
+   >
+     <Icon name="x" size={14} />
+   </button>
+ )}
  </div>
  ) : (
  <div className="steam-link empty">
  <span className="steam-link-name">En attente…</span>
+ {!runLocked && (
+   <button
+     type="button"
+     className="steam-link-add-bot"
+     onClick={promptAddBot}
+     title="Ajouter un bot pour ce slot"
+   >
+     <Icon name="plus" size={11} /> Bot
+   </button>
+ )}
  </div>
  )}
  </div>
@@ -1289,9 +1437,9 @@ function RoomPageInner() {
  <div className={`game-objective ${state.difficulty === "hardcore" ? "hc" : ""}`}>
  Objectif : <strong>{objective}</strong>
  </div>
- {g.appid && members.length > 0 && (
+ {g.appid && members.some((m) => !isSyntheticId(m.steamId)) && (
  <div className="game-owners" aria-label="Possession Steam">
- {members.map((m) => {
+ {members.filter((m) => !isSyntheticId(m.steamId)).map((m) => {
  const key = String(g.appid);
  const auto = state.ownership?.[m.steamId]?.[key];
  const override = state.ownershipOverride?.[m.steamId]?.[key];
@@ -1333,24 +1481,34 @@ function RoomPageInner() {
  <div className="game-champion">
  {isDrawing && slotData ? (
  <>
- Tirage en cours...
+ Tirage en cours…
  <div className={`slot-machine ${slotData.locked.every(Boolean) ? "locked" : ""}`}>
- {slotData.reels.map((cells, r) => (
- <div className="slot-reel"key={r}>
- <div className="slot-strip"id={`strip${r}`}>
+ {slotData.reels.map((cells, r) => {
+ // For duo draws (pairSize=2), drop a separator between consecutive
+ // pairs: "&" within a pair, "·" between independent pairs.
+ const inPair = slotData.pairSize > 1 && r > 0 && r % slotData.pairSize !== 0;
+ const betweenPairs = slotData.pairSize > 1 && r > 0 && r % slotData.pairSize === 0;
+ return (
+ <React.Fragment key={r}>
+ {inPair && <div className="slot-sep slot-sep-and" aria-hidden="true">&amp;</div>}
+ {betweenPairs && <div className="slot-sep slot-sep-pair" aria-hidden="true">·</div>}
+ <div className="slot-reel">
+ <div className="slot-strip" id={`strip${r}`}>
  {cells.map((c, ci) => (
- <div className="slot-cell"key={ci}>
+ <div className="slot-cell" key={ci}>
  {c}
  </div>
  ))}
  </div>
  </div>
- ))}
+ </React.Fragment>
+ );
+ })}
  </div>
  </>
 ) : champion ? (
  effMode === "duo" ? (
- <>Duo désigné : <span className="name">{champion}</span></>
+ <>{champion.includes(" · ") ? "Duos désignés" : "Duo désigné"} : <span className="name">{champion}</span></>
 ) : (
  <>Champion désigné : <span className="name">{champion}</span></>
  )
@@ -1441,7 +1599,7 @@ function RoomPageInner() {
  state.history.map((entry) => {
  const failed = entry.failedGameId ? POOL.find((g) => g.id === entry.failedGameId) : null;
  const tag = entry.outcome === "win" ? "🏆" : "💀";
- const status = entry.outcome === "win" ? "GAUNTLET WIN" : "Failed";
+ const status = entry.outcome === "win" ? "GAUNTLET WIN" : "GAUNTLET FAILED";
  return (
  <div
  key={entry.id}
@@ -1482,7 +1640,7 @@ function RoomPageInner() {
 
  {/* RULES */}
  <div className="rules">
- <strong> Règles du Gauntlet</strong>
+ <strong>Règles du Gauntlet</strong>
  <ul>
  <li>
  Vous devez réussir l&apos;objectif des <strong>10 jeux dans l&apos;ordre</strong> sans une seule défaite.
@@ -1495,7 +1653,7 @@ function RoomPageInner() {
  Les jeux marqués <span style={{ color: "var(--gold)", fontWeight: 700 }}>SOLO</span> doivent être réussis par <strong>un seul joueur tiré au sort</strong>.
  </li>
  <li>
- Les jeux marqués <span style={{ color: "var(--accent-2)", fontWeight: 700 }}>DUO</span> doivent être réussis par <strong>2 joueurs tirés au sort</strong>.
+ Les jeux marqués <span style={{ color: "var(--accent-2)", fontWeight: 700 }}>DUO</span> sont joués en duo tiré au sort. Avec 4+ joueurs, le tirage forme plusieurs duos coopératifs en parallèle (chaque duo joue le même objectif de son côté).
  </li>
  <li>
  Mode <strong>Hardcore</strong> : objectifs nettement plus exigeants.
@@ -1565,7 +1723,7 @@ function RoomPageInner() {
  {overlay.kind === "win" && (
  <div className="overlay win">
  <div className="overlay-content">
- <h2> GAUNTLET COMPLETED </h2>
+ <h2>GAUNTLET COMPLETED</h2>
  <p>Vous avez vaincu les 10 épreuves sans une seule défaite. Le panthéon vous attend.</p>
  <button
  className="btn btn-large btn-win"
@@ -1583,7 +1741,7 @@ function RoomPageInner() {
  {overlay.kind === "lose" && (
  <div className="overlay lose">
  <div className="overlay-content">
- <h2>GAUNTLET FAILED </h2>
+ <h2>GAUNTLET FAILED</h2>
  <p>{overlay.msg}</p>
  <button className="btn btn-large btn-lose"onClick={() => setOverlay({ kind: null })}>
  Repartir au combat

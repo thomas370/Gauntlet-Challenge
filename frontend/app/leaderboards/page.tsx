@@ -8,6 +8,7 @@ import type {
   LeaderboardsPayload,
 } from "@/lib/types/stats";
 import type { Difficulty } from "@/lib/types";
+import { isGuestId } from "@/lib/types/steam";
 
 function fmtDuration(s: number): string {
   if (s < 60) return `${s}s`;
@@ -120,7 +121,12 @@ function FastestList({ runs }: { runs: LeaderboardRun[] }) {
             {r.difficulty === "hardcore" ? "Hardcore" : "Normal"}
           </span>
           <div className="leaderboard-players">
-            {r.players.map((p) => (
+            {r.players.map((p) => isGuestId(p.steamId) ? (
+              <span key={p.steamId} className="profile-run-player" title={`${p.displayName} (invité)`}>
+                <img src={p.avatarUrl} alt="" />
+                <span>{p.displayName}</span>
+              </span>
+            ) : (
               <Link
                 key={p.steamId}
                 href={`/u?id=${p.steamId}`}
@@ -157,10 +163,17 @@ function PlayerLeaderboard({
           {entries.map((p, i) => (
             <li key={p.steamId} className="leaderboard-row">
               <span className="leaderboard-rank">#{i + 1}</span>
-              <Link href={`/u?id=${p.steamId}`} className="leaderboard-player">
-                <img src={p.avatarUrl} alt="" />
-                <span>{p.displayName}</span>
-              </Link>
+              {isGuestId(p.steamId) ? (
+                <span className="leaderboard-player" title={`${p.displayName} (invité)`}>
+                  <img src={p.avatarUrl} alt="" />
+                  <span>{p.displayName}</span>
+                </span>
+              ) : (
+                <Link href={`/u?id=${p.steamId}`} className="leaderboard-player">
+                  <img src={p.avatarUrl} alt="" />
+                  <span>{p.displayName}</span>
+                </Link>
+              )}
               <span className="leaderboard-value">{suffix(p.value)}</span>
             </li>
           ))}

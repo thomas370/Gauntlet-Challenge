@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { POOL } from "@/lib/games";
 import type { ProfilePayload } from "@/lib/types/stats";
+import { isGuestId } from "@/lib/types/steam";
 
 const STEAM_ID_RE = /^\d{17}$/;
 
@@ -47,6 +48,11 @@ function ProfileBody() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isGuestId(id)) {
+      setError("Profil non disponible pour les joueurs invités.");
+      setLoading(false);
+      return;
+    }
     if (!STEAM_ID_RE.test(id)) {
       setError("ID Steam invalide");
       setLoading(false);
@@ -189,7 +195,16 @@ function ProfileBody() {
                   <div className="profile-run-players">
                     {r.players
                       .filter((p) => p.steamId !== player.steamId)
-                      .map((p) => (
+                      .map((p) => isGuestId(p.steamId) ? (
+                        <span
+                          key={p.steamId}
+                          className="profile-run-player"
+                          title={`${p.displayName} (invité)`}
+                        >
+                          <img src={p.avatarUrl} alt="" />
+                          <span>{p.displayName}</span>
+                        </span>
+                      ) : (
                         <Link
                           key={p.steamId}
                           href={`/u?id=${p.steamId}`}

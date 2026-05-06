@@ -5,6 +5,8 @@ import type { SteamSessionUser } from "./steam";
 
 export interface RoomMember extends SteamSessionUser {
   joinedAt: number;
+  /** Twitch link summary, present iff the member has linked their Twitch account. */
+  twitch?: { login: string; displayName: string } | null;
 }
 
 export interface RoomSnapshot {

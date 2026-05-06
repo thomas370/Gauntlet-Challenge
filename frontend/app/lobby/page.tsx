@@ -2,12 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { SteamSessionUser } from "@/lib/types/steam";
+import { isGuestId, type SteamSessionUser } from "@/lib/types/steam";
 import type { RoomSnapshot } from "@/lib/types/room";
+
+interface TwitchSummary {
+  login: string;
+  displayName: string;
+}
 
 export default function LobbyPage() {
   const router = useRouter();
   const [user, setUser] = useState<SteamSessionUser | null>(null);
+  const [twitch, setTwitch] = useState<TwitchSummary | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -31,6 +37,14 @@ export default function LobbyPage() {
           return;
         }
         setUser(data.user);
+        // Best-effort Twitch link probe — the lobby still renders if it fails.
+        fetch("/api/twitch/me", { cache: "no-store" })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d: { connected?: boolean; login?: string; displayName?: string } | null) => {
+            if (cancelled || !d?.connected || !d.login || !d.displayName) return;
+            setTwitch({ login: d.login, displayName: d.displayName });
+          })
+          .catch(() => {});
       } catch (e) {
         if (cancelled) return;
         // Network failure (server down, mid-request shutdown, blocked by proxy).
@@ -120,19 +134,40 @@ export default function LobbyPage() {
         <div className="lobby-user">
           <img src={user.avatarUrl} alt="" className="lobby-avatar" />
           <div className="lobby-user-info">
-            <div className="lobby-user-name">{user.displayName}</div>
+            <div className="lobby-user-name">
+              <span>{user.displayName}</span>
+              {twitch && (
+                <span
+                  className="lobby-user-twitch"
+                  title={`Twitch connecté : ${twitch.displayName}`}
+                  aria-label={`Twitch connecté : ${twitch.displayName}`}
+                >
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 2H3v16h5v4l4-4h5l4-4V2zM11 11V7M16 11V7"/>
+                  </svg>
+                </span>
+              )}
+            </div>
             <button className="lobby-logout" onClick={logout}>Se déconnecter</button>
           </div>
         </div>
 
         <div className="lobby-quick-links">
-          <a href={`/u?id=${user.steamId}`}>Mon profil</a>
-          <span aria-hidden>·</span>
+          {!isGuestId(user.steamId) && (
+            <>
+              <a href={`/u?id=${user.steamId}`}>Mon profil</a>
+              <span aria-hidden>·</span>
+            </>
+          )}
           <a href="/leaderboards/">Classements</a>
           <span aria-hidden>·</span>
           <a href="/games/">Stats par jeu</a>
-          <span aria-hidden>·</span>
-          <a href="/twitch/">Twitch</a>
+          {!isGuestId(user.steamId) && (
+            <>
+              <span aria-hidden>·</span>
+              <a href="/twitch/">Twitch</a>
+            </>
+          )}
         </div>
 
         <h1 className="auth-title">Salon</h1>
