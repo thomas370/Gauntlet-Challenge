@@ -58,7 +58,13 @@ function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number;
 // === GAME COVER (Steam library art or custom URL) ===
 function GameCover({ appid, cover, name, size = "md" }: { appid?: number; cover?: string; name: string; size?: "sm" | "md" | "lg" }) {
   const src = cover ?? (appid ? `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/library_600x900.jpg` : null);
-  if (!src) {
+  // Track which URL we failed to load. Comparing against the current `src`
+  // means the fallback resets automatically if `src` later changes (e.g. an
+  // appid is added to the entry). Avoids a separate useEffect.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = src !== null && failedSrc === src;
+
+  if (!src || failed) {
     return (
       <div className={`game-cover game-cover-${size} game-cover-fallback`}>
         <span>{name.slice(0, 2).toUpperCase()}</span>
@@ -71,7 +77,7 @@ function GameCover({ appid, cover, name, size = "md" }: { appid?: number; cover?
         src={src}
         alt={name}
         loading="lazy"
-        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+        onError={() => setFailedSrc(src)}
       />
     </div>
   );
@@ -966,7 +972,12 @@ function RoomPageInner() {
  (g) =>
  (localFilter === "all" || g.cat === localFilter) &&
  (!localSearch || g.name.toLowerCase().includes(localSearch.toLowerCase()))
- );
+ ).sort((a, b) => {
+   const aPinned = state.pinned.includes(a.id);
+   const bPinned = state.pinned.includes(b.id);
+   if (aPinned !== bPinned) return aPinned ? -1 : 1;
+   return a.name.localeCompare(b.name, "fr", { sensitivity: "base" });
+ });
  const progressPct = state.run.length === 0 ? 0 : (state.done.length / state.run.length) * 100;
  // Lock config once a run is active (run generated + countdown done)
  const runLocked = state.run.length > 0;

@@ -166,16 +166,20 @@ function GameRow({ row }: { row: Row }) {
   const { game, drawn, completed, failed, attempts, clearancePct, avgDurationSeconds } = row;
   const cover = coverSrc(game);
   const name = game?.name ?? `Jeu #${row.gameId}`;
+  // `failed` is already destructured above (the run-failure count); use a
+  // distinct name for cover-load failures.
+  const [coverFailedSrc, setCoverFailedSrc] = useState<string | null>(null);
+  const coverFailed = cover !== null && coverFailedSrc === cover;
   return (
     <div className="games-stats-row" role="row">
       <div className="games-stats-game">
-        {cover ? (
+        {cover && !coverFailed ? (
           <img
             src={cover}
             alt=""
             className="games-stats-cover"
             loading="lazy"
-            onError={(e) => { (e.currentTarget.style.display = "none"); }}
+            onError={() => setCoverFailedSrc(cover)}
           />
         ) : (
           <div className="games-stats-cover games-stats-cover-fallback">
