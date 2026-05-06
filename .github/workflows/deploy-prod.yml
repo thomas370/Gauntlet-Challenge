@@ -16,7 +16,7 @@ jobs:
           script: |
             cd /home/bortolato/www/Gauntlet-Challenge
             git stash -u
-            git pull origin main
+            git pull
             git stash pop
             npm ci
             npm --workspace frontend run build
