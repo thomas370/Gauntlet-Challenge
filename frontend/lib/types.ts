@@ -69,6 +69,18 @@ export interface GauntletState {
   // `timer: true`). Null when no countdown is running. Reset to null on every
   // game advance / loss / reset so it doesn't leak into the next game.
   timerDeadline: number | null;
+  // In-flight slot-machine champion draw, broadcast so every client renders
+  // the same reels and runs the animation from the same `startedAt`. Cleared
+  // when the initiator commits the result to `champions`. Null when no draw
+  // is in flight.
+  drawing: {
+    gameId: number;
+    reels: string[][];
+    final: string[];
+    pairSize: number;
+    startedAt: number;
+    initiator: string;
+  } | null;
   runFails: Record<number, number>;
   history: RunHistoryEntry[];
   steamLinks: Record<number, SteamLink>;
@@ -102,6 +114,7 @@ export const DEFAULT_STATE: GauntletState = {
   showHistory: false,
   runStartTime: null,
   timerDeadline: null,
+  drawing: null,
   runFails: {},
   history: [],
   steamLinks: {},

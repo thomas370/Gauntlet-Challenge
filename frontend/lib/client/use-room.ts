@@ -23,8 +23,6 @@ export function useRoom(code: string): UseRoomResult {
 
   const stateRef  = useRef<GauntletState>(DEFAULT_STATE);
   const socketRef = useRef<Socket | null>(null);
-  // Dernier état envoyé au serveur — sert à ignorer notre propre écho
-  const lastSentRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!code) return;
@@ -57,17 +55,13 @@ export function useRoom(code: string): UseRoomResult {
 
     // ── événements serveur ───────────────────────────────────────────────────
     socket.on("state", (event: Extract<RoomEvent, { type: "state" }>) => {
-      const incoming = JSON.stringify(event.state);
-
-      // Si c'est notre propre écho (même état qu'on vient d'envoyer),
-      // on met quand même à jour stateRef pour garder le ref server-authoritative,
-      // mais on évite un re-render inutile si déjà à jour.
-      if (incoming === lastSentRef.current) {
-        stateRef.current = event.state;
-        return; // pas de re-render, l'UI est déjà à jour optimistiquement
-      }
-
-      // État venant d'un autre joueur → on applique immédiatement
+      // Always apply the server's authoritative state — including the sender's
+      // own echo. The previous JSON-equality echo-suppression saved one
+      // re-render but caused divergence when property order changed during the
+      // round-trip (e.g. stale backend that initialised state without a newer
+      // field, then re-emitted it in a different position). The cost of an
+      // extra render after each local mutation is negligible vs the bug class
+      // it eliminates.
       stateRef.current = event.state;
       setLocalState(event.state);
     });
@@ -111,13 +105,14 @@ export function useRoom(code: string): UseRoomResult {
 
       if (next === prev) return; // no-op
 
-      // 1. Mise à jour locale optimiste (UI instantanée)
+      // 1. Mise à jour locale optimiste (UI instantanée). Le broadcast
+      //    serveur ré-appliquera l'état canonique en arrivant — on ne
+      //    suppresse plus l'écho, ce qui élimine les divergences subtiles
+      //    quand l'ordre des propriétés change pendant le round-trip.
       stateRef.current = next;
       setLocalState(next);
 
-      // 2. Envoyer au serveur — qui broadcast à tous les membres
-      const serialized = JSON.stringify(next);
-      lastSentRef.current = serialized;
+      // 2. Envoyer au serveur — qui broadcast à tous les membres.
       socketRef.current?.emit("mutate", { state: next });
     },
     [],

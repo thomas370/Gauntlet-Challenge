@@ -2,7 +2,6 @@
 
 import React, { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { flushSync } from "react-dom";
 import { POOL, getCategories, effectiveMode } from "@/lib/games";
 import { CAT_ICONS } from "@/lib/icons";
 import {
@@ -150,16 +149,6 @@ function RoomPageInner() {
  const [localSearch, setLocalSearch] = useState("");
  const [localFilter, setLocalFilter] = useState("all");
  const [overlay, setOverlay] = useState<{ kind: "win" | "lose" | null; msg?: string }>({ kind: null });
- const [drawingFor, setDrawingFor] = useState<number | null>(null);
- const [slotData, setSlotData] = useState<{
- reels: string[][];
- final: string[];
- locked: boolean[];
- // Size of each cooperating pair. 1 for solo (no separators), 2 for duo
- // (a "&" separator between every pair of reels). Duos are independent —
- // they each tackle the objective on their own.
- pairSize: number;
- } | null>(null);
  const [swappedIdx, setSwappedIdx] = useState<number | null>(null);
  const [shaking, setShaking] = useState(false);
  const [pendingRun, setPendingRun] = useState<number[] | null>(null);
@@ -290,6 +279,76 @@ function RoomPageInner() {
     return () => clearTimeout(t);
   }, [countdown, pendingRun]);
 
+ // === SLOT MACHINE ANIMATION ===
+ // Driven entirely by `state.drawing`. Every client receiving the broadcast
+ // runs its own local rAF, but the animation timing is wall-clock based on
+ // `drawing.startedAt`, so late-arriving receivers fast-forward to the right
+ // frame instead of replaying from zero. Only the initiator writes the
+ // result back into `state.champions`, avoiding multi-writer races.
+ useEffect(() => {
+   const drawing = state.drawing;
+   if (!drawing) return;
+
+   initAudio();
+
+   let cancelled = false;
+   const stripCellHeight = 32;
+   const cyclesForReel = (r: number) => 10 + r * 4;
+
+   const runReel = (r: number): Promise<void> => {
+     const strip = document.getElementById(`strip${r}`) as HTMLDivElement | null;
+     if (!strip) return Promise.resolve();
+     const totalCells = cyclesForReel(r) + 1;
+     const targetY = (totalCells - 1) * stripCellHeight;
+     const duration = 1200 + r * 400;
+     return new Promise<void>((resolve) => {
+       let lastCell = -1;
+       const frame = () => {
+         if (cancelled) return resolve();
+         const elapsed = Date.now() - drawing.startedAt;
+         const t = Math.min(1, elapsed / duration);
+         const ease = 1 - Math.pow(1 - t, 3);
+         const y = ease * targetY;
+         strip.style.transform = `translateY(-${y}px)`;
+         if (t < 1) {
+           const cellsPassed = Math.floor(y / stripCellHeight);
+           if (cellsPassed !== lastCell) {
+             lastCell = cellsPassed;
+             beep(300 + Math.random() * 200, 0.04, "square", 0.05);
+           }
+           requestAnimationFrame(frame);
+         } else {
+           beep(800, 0.08, "triangle", 0.18);
+           resolve();
+         }
+       };
+       requestAnimationFrame(frame);
+     });
+   };
+
+   // One-frame delay so the slot DOM is committed before we read strip refs.
+   const rafId = requestAnimationFrame(() => {
+     Promise.all(drawing.final.map((_, r) => runReel(r))).then(() => {
+       if (cancelled) return;
+       if (drawing.initiator !== me?.steamId) return;
+       setTimeout(() => {
+         if (cancelled) return;
+         const finalName = formatChampion(drawing.final, drawing.pairSize);
+         setState((s) => ({
+           ...s,
+           champions: { ...s.champions, [drawing.gameId]: finalName },
+           drawing: null,
+         }));
+       }, 350);
+     });
+   });
+
+   return () => {
+     cancelled = true;
+     cancelAnimationFrame(rafId);
+   };
+   // eslint-disable-next-line react-hooks/exhaustive-deps
+ }, [state.drawing?.startedAt, state.drawing?.gameId, state.drawing?.initiator, me?.steamId]);
 
  // === SOUND ===
  const initAudio = () => {
@@ -446,7 +505,7 @@ function RoomPageInner() {
  h.el.removeEventListener("mouseleave", h.leave);
  });
  };
- }, [state.run, state.current, state.done.length, drawingFor]);
+ }, [state.run, state.current, state.done.length, state.drawing?.gameId]);
 
  // === SHAKE ===
  const shakeScreen = () => {
@@ -730,63 +789,21 @@ function RoomPageInner() {
  reels.push(cells);
  }
 
- // Force-render the slot machine DOM before reading element refs
- flushSync(() => {
- setDrawingFor(gameId);
- setSlotData({ reels, final, locked: final.map(() => false), pairSize });
- });
-
- const stripCellHeight = 32;
- // Wait one paint cycle to ensure layout is committed
- requestAnimationFrame(() => {
- const promises = final.map((_, r) => {
- const strip = document.getElementById(`strip${r}`) as HTMLDivElement | null;
- if (!strip) {
- console.warn(`strip${r} not found in DOM`);
- return Promise.resolve();
- }
- const totalCells = cyclesForReel(r) + 1;
- const targetY = (totalCells - 1) * stripCellHeight;
- const duration = 1200 + r * 400;
- const start = performance.now();
- return new Promise<void>((resolve) => {
- let lastCell = -1;
- const frame = (now: number) => {
- const t = Math.min(1, (now - start) / duration);
- const ease = 1 - Math.pow(1 - t, 3);
- const y = ease * targetY;
- strip.style.transform = `translateY(-${y}px)`;
- if (t < 1) {
- const cellsPassed = Math.floor(y / stripCellHeight);
- if (cellsPassed !== lastCell) {
- lastCell = cellsPassed;
- beep(300 + Math.random() * 200, 0.04, "square", 0.05);
- }
- requestAnimationFrame(frame);
- } else {
- setSlotData((prev) => {
- if (!prev) return prev;
- const newLocked = [...prev.locked];
- newLocked[r] = true;
- return { ...prev, locked: newLocked };
- });
- beep(800, 0.08, "triangle", 0.18);
- resolve();
- }
- };
- requestAnimationFrame(frame);
- });
- });
-
- Promise.all(promises).then(() => {
- setTimeout(() => {
- const finalName = formatChampion(final, pairSize);
- setState((s) => ({ ...s, champions: { ...s.champions, [gameId]: finalName } }));
- setDrawingFor(null);
- setSlotData(null);
- }, 350);
- });
- });
+ // Push the draw into synced state — every client reads `state.drawing` and
+ // runs the local rAF animation in the effect below. Animation start time is
+ // wall-clock so late receivers catch up to the right frame instead of
+ // replaying from zero.
+ setState((s) => ({
+   ...s,
+   drawing: {
+     gameId,
+     reels,
+     final,
+     pairSize,
+     startedAt: Date.now(),
+     initiator: me?.steamId ?? "",
+   },
+ }));
  };
 
  // === HISTORY ===
@@ -1432,7 +1449,7 @@ function RoomPageInner() {
  const isPinned = state.pinned.includes(gameId);
  const objective = state.difficulty === "hardcore" ? g.hardcore : g.normal;
  const champion = state.champions[gameId];
- const isDrawing = drawingFor === gameId && slotData;
+ const isDrawing = state.drawing?.gameId === gameId;
 
  const classes = [
  "game",
@@ -1465,6 +1482,94 @@ function RoomPageInner() {
  <div className={`game-objective ${state.difficulty === "hardcore" ? "hc" : ""}`}>
  Objectif : <strong>{objective}</strong>
  </div>
+ {g.appid && members.some((m) => !isSyntheticId(m.steamId)) && (
+ <div className="game-owners" aria-label="Possession Steam">
+ {members.filter((m) => !isSyntheticId(m.steamId)).map((m) => {
+ const key = String(g.appid);
+ const auto = state.ownership?.[m.steamId]?.[key];
+ const override = state.ownershipOverride?.[m.steamId]?.[key];
+ const owned = override !== undefined ? override : auto;
+ const status = owned === true ? "owns" : owned === false ? "missing" : "unknown";
+ const isMe = me?.steamId === m.steamId;
+ const isOverride = override !== undefined;
+ const baseTip =
+ status === "owns" ? `${m.displayName} possède ${g.name}` :
+ status === "missing" ? `${m.displayName} n'a pas ${g.name} sur Steam` :
+ `${m.displayName} : possession inconnue (profil privé ?)`;
+ const tip =
+ isMe ? `${baseTip} — clique pour ${owned === true ? "indiquer que tu ne l'as pas" : "indiquer que tu l'as"}` :
+ isOverride ? `${baseTip} (déclaration manuelle)` :
+ baseTip;
+ return (
+ <span
+ key={m.steamId}
+ className={`owner-chip ${status}${isMe ? " clickable" : ""}${isOverride ? " override" : ""}`}
+ title={tip}
+ onClick={isMe && g.appid ? () => toggleOwnershipOverride(g.appid as number) : undefined}
+ role={isMe ? "button" : undefined}
+ tabIndex={isMe ? 0 : undefined}
+ onKeyDown={isMe && g.appid ? (e) => {
+ if (e.key === "Enter" || e.key === " ") {
+ e.preventDefault();
+ toggleOwnershipOverride(g.appid as number);
+ }
+ } : undefined}
+ >
+ <img src={m.avatarUrl} alt="" />
+ <span className="owner-mark">{status === "owns" ? "✓" : status === "missing" ? "✗" : "?"}</span>
+ </span>
+ );
+ })}
+ </div>
+ )}
+ {isSolo && (
+ <div className="game-champion">
+ {isDrawing && state.drawing ? (() => {
+ const drawing = state.drawing;
+ // Each reel finishes its rAF after `1200 + r * 400` ms; once every reel
+ // has finished, the whole machine snaps to "locked" styling.
+ const allLocked = drawing.reels.every((_, r) => (now - drawing.startedAt) >= (1200 + r * 400));
+ return (
+ <>
+ Tirage en cours…
+ <div className={`slot-machine ${allLocked ? "locked" : ""}`}>
+ {drawing.reels.map((cells, r) => {
+ // For duo draws (pairSize=2), drop a separator between consecutive
+ // pairs: "&" within a pair, "·" between independent pairs.
+ const inPair = drawing.pairSize > 1 && r > 0 && r % drawing.pairSize !== 0;
+ const betweenPairs = drawing.pairSize > 1 && r > 0 && r % drawing.pairSize === 0;
+ return (
+ <React.Fragment key={r}>
+ {inPair && <div className="slot-sep slot-sep-and" aria-hidden="true">&amp;</div>}
+ {betweenPairs && <div className="slot-sep slot-sep-pair" aria-hidden="true">·</div>}
+ <div className="slot-reel">
+ <div className="slot-strip" id={`strip${r}`}>
+ {cells.map((c, ci) => (
+ <div className="slot-cell" key={ci}>
+ {c}
+ </div>
+ ))}
+ </div>
+ </div>
+ </React.Fragment>
+ );
+ })}
+ </div>
+ </>
+ );
+ })() : champion ? (
+ effMode === "duo" ? (
+ <>{champion.includes(" · ") ? "Duos désignés" : "Duo désigné"} : <span className="name">{champion}</span></>
+) : (
+ <>Champion désigné : <span className="name">{champion}</span></>
+ )
+) : effMode === "duo" ? (
+ <>Aucun duo tiré — <em>Tirage au sort requis</em></>
+) : (
+ <>Aucun champion tiré — <em>Tirage au sort requis</em></>
+ )}
+ </div>
+ )}
  {isCurrent && g.timer && (
    (() => {
      // `?? null` normalises any pre-feature room state where the field is
@@ -1521,88 +1626,6 @@ function RoomPageInner() {
        </div>
      );
    })()
- )}
- {g.appid && members.some((m) => !isSyntheticId(m.steamId)) && (
- <div className="game-owners" aria-label="Possession Steam">
- {members.filter((m) => !isSyntheticId(m.steamId)).map((m) => {
- const key = String(g.appid);
- const auto = state.ownership?.[m.steamId]?.[key];
- const override = state.ownershipOverride?.[m.steamId]?.[key];
- const owned = override !== undefined ? override : auto;
- const status = owned === true ? "owns" : owned === false ? "missing" : "unknown";
- const isMe = me?.steamId === m.steamId;
- const isOverride = override !== undefined;
- const baseTip =
- status === "owns" ? `${m.displayName} possède ${g.name}` :
- status === "missing" ? `${m.displayName} n'a pas ${g.name} sur Steam` :
- `${m.displayName} : possession inconnue (profil privé ?)`;
- const tip =
- isMe ? `${baseTip} — clique pour ${owned === true ? "indiquer que tu ne l'as pas" : "indiquer que tu l'as"}` :
- isOverride ? `${baseTip} (déclaration manuelle)` :
- baseTip;
- return (
- <span
- key={m.steamId}
- className={`owner-chip ${status}${isMe ? " clickable" : ""}${isOverride ? " override" : ""}`}
- title={tip}
- onClick={isMe && g.appid ? () => toggleOwnershipOverride(g.appid as number) : undefined}
- role={isMe ? "button" : undefined}
- tabIndex={isMe ? 0 : undefined}
- onKeyDown={isMe && g.appid ? (e) => {
- if (e.key === "Enter" || e.key === " ") {
- e.preventDefault();
- toggleOwnershipOverride(g.appid as number);
- }
- } : undefined}
- >
- <img src={m.avatarUrl} alt="" />
- <span className="owner-mark">{status === "owns" ? "✓" : status === "missing" ? "✗" : "?"}</span>
- </span>
- );
- })}
- </div>
- )}
- {isSolo && (
- <div className="game-champion">
- {isDrawing && slotData ? (
- <>
- Tirage en cours…
- <div className={`slot-machine ${slotData.locked.every(Boolean) ? "locked" : ""}`}>
- {slotData.reels.map((cells, r) => {
- // For duo draws (pairSize=2), drop a separator between consecutive
- // pairs: "&" within a pair, "·" between independent pairs.
- const inPair = slotData.pairSize > 1 && r > 0 && r % slotData.pairSize !== 0;
- const betweenPairs = slotData.pairSize > 1 && r > 0 && r % slotData.pairSize === 0;
- return (
- <React.Fragment key={r}>
- {inPair && <div className="slot-sep slot-sep-and" aria-hidden="true">&amp;</div>}
- {betweenPairs && <div className="slot-sep slot-sep-pair" aria-hidden="true">·</div>}
- <div className="slot-reel">
- <div className="slot-strip" id={`strip${r}`}>
- {cells.map((c, ci) => (
- <div className="slot-cell" key={ci}>
- {c}
- </div>
- ))}
- </div>
- </div>
- </React.Fragment>
- );
- })}
- </div>
- </>
-) : champion ? (
- effMode === "duo" ? (
- <>{champion.includes(" · ") ? "Duos désignés" : "Duo désigné"} : <span className="name">{champion}</span></>
-) : (
- <>Champion désigné : <span className="name">{champion}</span></>
- )
-) : effMode === "duo" ? (
- <>Aucun duo tiré — <em>Tirage au sort requis</em></>
-) : (
- <>Aucun champion tiré — <em>Tirage au sort requis</em></>
- )}
- </div>
  )}
  </div>
  <div className="game-actions">

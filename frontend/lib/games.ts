@@ -148,7 +148,7 @@ export const POOL: Game[] = [
   { id: 119, name: "Borderlands 4", cat: "FPS Coop", mode: "team", normal: "Battre un boss majeur en coop", hardcore: "Battre un boss en True Vault Hunter Mode", appid: 1285190 },
   { id: 120, name: "Elden Ring", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré bat un boss majeur", hardcore: "Joueur tiré bat Malenia, Lame de Miquella", appid: 1245620 },
   { id: 121, name: "Elden Ring Nightreign", cat: "Coop", mode: "team", normal: "Survivre une expédition Nightreign", hardcore: "Battre un Nightlord en coop", appid: 2622380 },
-  { id: 122, name: "Is This Seat Taken?", cat: "Puzzle", mode: "team", normal: "Finir un niveau", hardcore: "Finir un niveau dans le temps imparti", appid: 3035120, timer: true },
+  { id: 122, name: "Is This Seat Taken?", cat: "Puzzle", mode: "solo", normal: "Joueur tiré finit un niveau", hardcore: "Joueur tiré finit un niveau dans le temps imparti", appid: 3035120, timer: true },
   { id: 123, name: "SnowRunner", cat: "Coop", mode: "team", normal: "Finir une livraison contractuelle en coop", hardcore: "Finir une mission Hard en coop sans dégâts critiques", appid: 1465360 },
   { id: 124, name: "Euro Truck Simulator 2", cat: "Coop", mode: "team", normal: "Finir une livraison Convoy", hardcore: "Finir une livraison 1000km+ sans dégâts", appid: 227300 },
   { id: 125, name: "Call of Duty: Black Ops 6", cat: "FPS Compétitif", mode: "team", normal: "Win un match en multijoueur", hardcore: "Win un match Search and Destroy", cover: "/covers/cod-black-ops-6.jpg" },
