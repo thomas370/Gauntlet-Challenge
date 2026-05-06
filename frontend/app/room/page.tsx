@@ -165,6 +165,9 @@ function RoomPageInner() {
  const [reviewing, setReviewing] = useState(false);
  const [countdown, setCountdown] = useState<number | null>(null);
  const [now, setNow] = useState<number>(Date.now());
+ // Per-game timer duration the local user has dialled in (minutes). Synced
+ // deadline lives in `state.timerDeadline`; this is just the input box.
+ const [timerInputMin, setTimerInputMin] = useState<number>(5);
  const [objTip, setObjTip] = useState<{ id: number; right: number; top: number; bottom: number; flipUp: boolean } | null>(null);
  const [showOverlays, setShowOverlays] = useState(false);
  const [overlayCopied, setOverlayCopied] = useState<string | null>(null);
@@ -277,6 +280,7 @@ function RoomPageInner() {
         champions: {},
         attempt: 1,
         runStartTime: Date.now(),
+        timerDeadline: null,
         runFails: {},
       }));
       setPendingRun(null);
@@ -808,13 +812,22 @@ function RoomPageInner() {
  return [entry, ...(s.history || [])].slice(0, 50);
  };
 
+ // === PER-GAME COUNTDOWN (only for games with `timer: true`) ===
+ // Sets / clears `state.timerDeadline` which is broadcast to every client in
+ // the room — all players see the same countdown.
+ const startTimer = (minutes: number) => {
+   const m = Number.isFinite(minutes) && minutes > 0 ? Math.min(minutes, 120) : 5;
+   setState((s) => ({ ...s, timerDeadline: Date.now() + Math.round(m * 60_000) }));
+ };
+ const resetTimer = () => setState((s) => ({ ...s, timerDeadline: null }));
+
  // === WIN / LOSE ===
  const winGame = (gameId: number) => {
  setState((s) => {
  if (s.done.includes(gameId)) return s;
  const newDone = [...s.done, gameId];
  const newCurrent = s.current + 1;
- let next: GauntletState = { ...s, done: newDone, current: newCurrent };
+ let next: GauntletState = { ...s, done: newDone, current: newCurrent, timerDeadline: null };
  if (newDone.length === s.run.length) {
  // FULL GAUNTLET — append the history entry; the celebration useEffect
  // below picks up the new history[0].id and fires confetti + overlay.
@@ -863,7 +876,7 @@ function RoomPageInner() {
  if (s.penaltyMode === "stepback") {
  if (idx <= 0) {
  msg = `Défaite sur ${g?.name ?? "ce jeu"}. Tu es au jeu 1, impossible de reculer plus — réessaye !`;
- next = { ...s, attempt: s.attempt + 1, runFails };
+ next = { ...s, attempt: s.attempt + 1, runFails, timerDeadline: null };
  } else {
  const prevGameId = s.run[idx - 1];
  const prevG = POOL.find((x) => x.id === prevGameId);
@@ -874,6 +887,7 @@ function RoomPageInner() {
  current: idx - 1,
  done: s.done.filter((x) => x !== prevGameId),
  runFails,
+ timerDeadline: null,
  };
  }
  } else {
@@ -887,6 +901,7 @@ function RoomPageInner() {
  done: [],
  champions: {},
  runStartTime: Date.now(),
+ timerDeadline: null,
  runFails: {},
  history: newHistory,
  };
@@ -908,6 +923,7 @@ function RoomPageInner() {
  champions: {},
  run: [],
  runStartTime: null,
+ timerDeadline: null,
  runFails: {},
  }));
  };
@@ -1448,6 +1464,48 @@ function RoomPageInner() {
  <div className={`game-objective ${state.difficulty === "hardcore" ? "hc" : ""}`}>
  Objectif : <strong>{objective}</strong>
  </div>
+ {isCurrent && g.timer && (
+   (() => {
+     // `?? null` normalises any pre-feature room state where the field is
+     // undefined — keeps the active/inactive check simple.
+     const deadline = state.timerDeadline ?? null;
+     const remainingMs = deadline !== null ? Math.max(0, deadline - now) : 0;
+     const expired = deadline !== null && remainingMs === 0;
+     const totalSec = Math.floor(remainingMs / 1000);
+     const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
+     const ss = String(totalSec % 60).padStart(2, "0");
+     return (
+       <div className={`game-timer ${expired ? "expired" : ""}`}>
+         {deadline === null ? (
+           <>
+             <label className="game-timer-label">Minuteur :</label>
+             <input
+               type="number"
+               className="game-timer-input"
+               min={1}
+               max={120}
+               value={timerInputMin}
+               onChange={(e) => setTimerInputMin(Number(e.target.value))}
+               aria-label="Durée en minutes"
+             />
+             <span className="game-timer-unit">min</span>
+             <button className="btn btn-timer" onClick={() => startTimer(timerInputMin)}>
+               Démarrer
+             </button>
+           </>
+         ) : (
+           <>
+             <span className="game-timer-label">{expired ? "Temps écoulé !" : "Temps restant :"}</span>
+             <span className="game-timer-clock">{mm}:{ss}</span>
+             <button className="btn btn-timer-reset" onClick={resetTimer}>
+               Reset
+             </button>
+           </>
+         )}
+       </div>
+     );
+   })()
+ )}
  {g.appid && members.some((m) => !isSyntheticId(m.steamId)) && (
  <div className="game-owners" aria-label="Possession Steam">
  {members.filter((m) => !isSyntheticId(m.steamId)).map((m) => {

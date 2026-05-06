@@ -13,6 +13,9 @@ export interface Game {
   appid?: number;
   /** Custom cover URL (overrides appid). Used for non-Steam games. */
   cover?: string;
+  /** True for games whose objective is timed — surfaces a player-set countdown
+   *  on the current game tile, synced across all clients in the room. */
+  timer?: boolean;
 }
 
 export type Difficulty = "normal" | "hardcore";
@@ -62,6 +65,10 @@ export interface GauntletState {
   soundEnabled: boolean;
   showHistory: boolean;
   runStartTime: number | null;
+  // Absolute ms epoch when the per-game countdown expires (for games with
+  // `timer: true`). Null when no countdown is running. Reset to null on every
+  // game advance / loss / reset so it doesn't leak into the next game.
+  timerDeadline: number | null;
   runFails: Record<number, number>;
   history: RunHistoryEntry[];
   steamLinks: Record<number, SteamLink>;
@@ -94,6 +101,7 @@ export const DEFAULT_STATE: GauntletState = {
   soundEnabled: true,
   showHistory: false,
   runStartTime: null,
+  timerDeadline: null,
   runFails: {},
   history: [],
   steamLinks: {},

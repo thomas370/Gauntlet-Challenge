@@ -1231,6 +1231,67 @@ html, body {
 .game-objective strong { color: var(--text); font-weight: 500; }
 .game-objective.hc strong { color: var(--text); }
 
+.game-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid rgba(108, 181, 212, 0.3);
+  border-radius: 4px;
+  background: rgba(108, 181, 212, 0.06);
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+.game-timer-label { color: var(--muted); font-weight: 500; }
+.game-timer-input {
+  width: 56px;
+  padding: 3px 6px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+}
+.game-timer-input:focus { outline: none; border-color: var(--accent); }
+.game-timer-unit { color: var(--muted); }
+.game-timer-clock {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 18px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.game-timer.expired { border-color: rgba(217, 107, 107, 0.55); background: rgba(217, 107, 107, 0.1); }
+.game-timer.expired .game-timer-clock,
+.game-timer.expired .game-timer-label { color: #d96b6b; }
+.game-timer.expired .game-timer-clock { animation: timer-pulse 1s ease-in-out infinite; }
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.btn-timer {
+  padding: 4px 10px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  color: var(--bg-0);
+  font: inherit;
+  cursor: pointer;
+}
+.btn-timer:hover { filter: brightness(1.1); }
+.btn-timer-reset {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.btn-timer-reset:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.4); }
+
 .game-owners {
   display: flex;
   flex-wrap: wrap;
