@@ -250,6 +250,70 @@ html, body {
 .steam-link-name:hover {
   color: var(--accent);
 }
+.steam-link-stats {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  color: rgba(208, 211, 217, 0.45);
+  border: 1px solid transparent;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.steam-link-stats:hover {
+  color: var(--accent);
+  border-color: rgba(108, 181, 212, 0.3);
+  background: rgba(108, 181, 212, 0.08);
+}
+.steam-link-twitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  color: #9146ff;
+  flex-shrink: 0;
+}
+.steam-link.linked.bot {
+  border-color: rgba(203, 213, 225, 0.25);
+  border-style: dashed;
+}
+.steam-link-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(203, 213, 225, 0.12);
+  color: #cbd5e1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.steam-link-add-bot {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: transparent;
+  border: 1px dashed var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+.steam-link-add-bot:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 .steam-link-btn {
   background: transparent;
   border: 1px solid var(--line);
@@ -345,6 +409,39 @@ html, body {
 }
 .auth-btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: var(--bg-0); }
 
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.auth-divider::before, .auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #2a2f38;
+}
+.auth-guest-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+.auth-guest-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+.auth-guest-hint {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin: 0;
+}
+
 .lobby-card { gap: 16px; }
 .lobby-user {
   display: flex;
@@ -368,9 +465,23 @@ html, body {
   color: var(--text);
   font-weight: 600;
   font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.lobby-user-name > span:first-child {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+.lobby-user-twitch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #9146ff;
+  flex-shrink: 0;
 }
 .lobby-logout {
   background: transparent;
@@ -1424,6 +1535,26 @@ html, body {
   text-shadow: none;
 }
 .slot-machine.locked .slot-strip { animation: none; }
+.slot-sep {
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  font-weight: 700;
+}
+/* "&" tying two reels into a cooperating pair (tight, accent colour). */
+.slot-sep-and {
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--text);
+  opacity: 0.85;
+}
+/* Middle dot separating one cooperating pair from the next (looser, muted). */
+.slot-sep-pair {
+  padding: 0 10px;
+  font-size: 16px;
+  color: var(--muted);
+}
 @keyframes bounceLock { 0%,100% { transform: translateY(0); } }
 
 /* ====== CONFETTI (canvas hidden visually but kept for layout) ====== */
@@ -2165,4 +2296,570 @@ body.shake { animation: none; }
     grid-column: 1 / -1;
     font-size: 11px;
   }
+}
+
+/* === Profile page (/u?id=...) === */
+.profile-card {
+  max-width: 720px;
+  width: 100%;
+  gap: 24px;
+  align-items: stretch;
+  text-align: left;
+}
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.profile-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.profile-name {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: var(--text);
+}
+.profile-steam-link {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.profile-steam-link:hover { text-decoration: underline; }
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.profile-stat-tile {
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.profile-stat-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(208, 211, 217, 0.55);
+}
+.profile-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.1;
+}
+.profile-stat-sub {
+  font-size: 12px;
+  color: rgba(208, 211, 217, 0.7);
+}
+
+.profile-section-title {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(208, 211, 217, 0.6);
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+.profile-run-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.profile-run {
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.profile-run-win  { border-left-color: #5fbf7f; }
+.profile-run-lose { border-left-color: #d96b6b; }
+.profile-run-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.profile-run-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+.profile-run-badge-win  { background: rgba(95, 191, 127, 0.15); color: #5fbf7f; }
+.profile-run-badge-lose { background: rgba(217, 107, 107, 0.15); color: #d96b6b; }
+.profile-run-mode { color: rgba(208, 211, 217, 0.85); }
+.profile-run-progress { font-weight: 600; color: var(--text); }
+.profile-run-duration { color: rgba(208, 211, 217, 0.7); }
+.profile-run-date { margin-left: auto; color: rgba(208, 211, 217, 0.5); font-size: 12px; }
+.profile-run-failed {
+  font-size: 12px;
+  color: rgba(208, 211, 217, 0.75);
+}
+.profile-run-failed strong { color: #d96b6b; font-weight: 600; }
+.profile-run-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.profile-run-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 3px 8px 3px 3px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: rgba(208, 211, 217, 0.85);
+}
+.profile-run-player:hover { border-color: var(--accent); color: var(--text); }
+.profile-run-player img {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+}
+
+@media (max-width: 600px) {
+  .profile-run-date { margin-left: 0; width: 100%; }
+}
+
+/* === Leaderboards page === */
+.leaderboard-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.leaderboard-section-header .profile-section-title { margin-bottom: 0; }
+.leaderboard-tabs {
+  display: inline-flex;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+.leaderboard-tab {
+  background: transparent;
+  border: 0;
+  color: rgba(208, 211, 217, 0.6);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.leaderboard-tab:hover { color: var(--text); }
+.leaderboard-tab.is-active {
+  background: rgba(108, 181, 212, 0.15);
+  color: var(--accent);
+}
+
+.leaderboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  counter-reset: lb;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.leaderboard-rank {
+  font-weight: 700;
+  color: rgba(208, 211, 217, 0.5);
+  min-width: 32px;
+  font-size: 12px;
+}
+.leaderboard-row:nth-child(1) .leaderboard-rank { color: #e4c03c; }
+.leaderboard-row:nth-child(2) .leaderboard-rank { color: #b8b8b8; }
+.leaderboard-row:nth-child(3) .leaderboard-rank { color: #c98a4d; }
+.leaderboard-time {
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  min-width: 80px;
+}
+.leaderboard-players {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+.leaderboard-player {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--text);
+  flex: 1;
+  min-width: 0;
+}
+.leaderboard-player:hover { color: var(--accent); }
+.leaderboard-player img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.leaderboard-player span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.leaderboard-value {
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.lobby-quick-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(208, 211, 217, 0.5);
+}
+.lobby-quick-links a {
+  color: rgba(208, 211, 217, 0.7);
+  text-decoration: none;
+}
+.lobby-quick-links a:hover { color: var(--accent); }
+
+/* === Twitch settings page === */
+.twitch-flash-success {
+  color: #5fbf7f;
+  font-size: 13px;
+  background: rgba(95, 191, 127, 0.08);
+  border: 1px solid rgba(95, 191, 127, 0.3);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 0;
+}
+.twitch-status {
+  background: var(--bg-0);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.twitch-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.twitch-status-name { display: flex; flex-direction: column; }
+.twitch-status-name strong { color: var(--text); font-size: 16px; }
+.twitch-status-login { color: rgba(208, 211, 217, 0.5); font-size: 12px; }
+.twitch-status-pill {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+.twitch-status-meta {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(208, 211, 217, 0.75);
+}
+.twitch-status-meta code {
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--text);
+}
+.twitch-connect {
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+.twitch-btn-primary {
+  background: #9146ff;
+  color: white;
+}
+.twitch-btn-primary:hover { background: #a970ff; }
+
+.twitch-card { max-width: 720px; }
+.twitch-eventsub {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.twitch-eventsub-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+.twitch-eventsub-label {
+  color: rgba(208, 211, 217, 0.5);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.twitch-eventsub-state {
+  font-weight: 600;
+  font-size: 12px;
+}
+.twitch-eventsub-state.state-disconnected { color: #d96b6b; }
+.twitch-eventsub-state.state-connecting   { color: #e4c03c; }
+.twitch-eventsub-state.state-welcomed     { color: #e4c03c; }
+.twitch-eventsub-state.state-subscribed   { color: #5fbf7f; }
+.twitch-eventsub-state.state-stopping     { color: rgba(208, 211, 217, 0.5); }
+.twitch-eventsub-error { color: #d96b6b; font-size: 11px; }
+
+.twitch-effects {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.twitch-effect-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.twitch-effect-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.twitch-effect-main strong {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+}
+.twitch-effect-main small {
+  color: rgba(208, 211, 217, 0.5);
+  font-size: 11px;
+  margin-top: 2px;
+}
+.twitch-effect-costs {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.twitch-cost-ok { color: #5fbf7f; }
+.twitch-cost-pending { color: #e4c03c; }
+
+.twitch-activity {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.twitch-activity-row {
+  display: grid;
+  grid-template-columns: 60px 24px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+.twitch-activity-row:first-child { border-top: 0; }
+.twitch-activity-row.applied { background: rgba(95, 191, 127, 0.04); }
+.twitch-activity-row.failed  { background: rgba(217, 107, 107, 0.04); }
+.twitch-activity-time {
+  color: rgba(208, 211, 217, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+.twitch-activity-source {
+  text-align: center;
+  font-size: 13px;
+}
+.twitch-activity-effect {
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.twitch-activity-effect small {
+  color: rgba(208, 211, 217, 0.5);
+  font-weight: 400;
+}
+.twitch-activity-user {
+  color: rgba(208, 211, 217, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.twitch-activity-outcome {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: right;
+}
+.twitch-activity-row.applied .twitch-activity-outcome { color: #5fbf7f; }
+.twitch-activity-row.failed  .twitch-activity-outcome { color: #d96b6b; }
+
+@media (max-width: 600px) {
+  .twitch-activity-row {
+    grid-template-columns: 50px 20px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .twitch-activity-user, .twitch-activity-outcome {
+    grid-column: 1 / -1;
+    padding-left: 78px;
+  }
+}
+
+/* === Game-stats page === */
+.games-stats-card { max-width: 880px; }
+.games-stats-table {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-0);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.games-stats-head, .games-stats-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) 60px 60px 90px 70px 100px;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.games-stats-head {
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(208, 211, 217, 0.5);
+  font-weight: 600;
+}
+.games-stats-row { border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.games-stats-row:hover { background: rgba(255, 255, 255, 0.02); }
+.games-stats-game {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.games-stats-cover {
+  width: 32px;
+  height: 48px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+.games-stats-cover-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: rgba(208, 211, 217, 0.6);
+}
+.games-stats-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.games-stats-name span {
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.games-stats-name small {
+  color: rgba(208, 211, 217, 0.4);
+  font-size: 11px;
+}
+.games-stats-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.games-stats-head .num { color: rgba(208, 211, 217, 0.5); }
+.games-stats-pct small { color: rgba(208, 211, 217, 0.4); margin-left: 4px; }
+
+@media (max-width: 700px) {
+  .games-stats-head, .games-stats-row {
+    grid-template-columns: minmax(0, 1.6fr) 50px 50px 70px 60px;
+    font-size: 12px;
+    gap: 8px;
+  }
+  /* Hide the avg-time column on narrow screens. */
+  .games-stats-head > :nth-child(6),
+  .games-stats-row > :nth-child(6) { display: none; }
+  .games-stats-cover { width: 26px; height: 38px; }
 }

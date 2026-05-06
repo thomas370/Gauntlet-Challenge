@@ -11,10 +11,13 @@
 // On every state or membership mutation we re-broadcast to all subscribers. Each
 // subscriber is also detached automatically when its underlying response is closed.
 
+import crypto from "crypto";
 import { DEFAULT_STATE, type GauntletState } from "@shared/types";
-import type { SteamSessionUser } from "@shared/types/steam";
+import { BOT_ID_PREFIX, isBotId, type SteamSessionUser } from "@shared/types/steam";
 import type { RoomEvent, RoomMember, RoomSnapshot } from "@shared/types/room";
 import { mapToOverlay, type OverlayState } from "./overlay-state";
+import { recordRun } from "./db";
+import { getLinkBySteamId } from "./twitch-store";
 
 const MAX_MEMBERS = 8;
 const ROOM_TTL_MS = 12 * 60 * 60 * 1000; // 12h since last activity (active rooms)
@@ -121,11 +124,23 @@ if (!ggc._roomGcInterval) {
   ggc._roomGcInterval.unref?.();
 }
 
+function enrichMember(m: RoomMember): RoomMember {
+  const link = getLinkBySteamId(m.steamId);
+  return {
+    ...m,
+    twitch: link ? { login: link.login, displayName: link.displayName } : null,
+  };
+}
+
+function snapshotMembers(r: Room): RoomMember[] {
+  return Array.from(r.members.values()).map(enrichMember);
+}
+
 function snapshot(r: Room): RoomSnapshot {
   return {
     code: r.code,
     ownerSteamId: r.ownerSteamId,
-    members: Array.from(r.members.values()),
+    members: snapshotMembers(r),
     state: r.state,
     createdAt: r.createdAt,
   };
@@ -176,6 +191,104 @@ function findUserRoom(steamId: string): Room | null {
     if (!best || r.lastActivity > best.lastActivity) best = r;
   });
   return best;
+}
+
+/** Public lookup: room code of a user's most recently active room, or null. */
+export function findUserRoomCode(steamId: string): string | null {
+  return findUserRoom(steamId)?.code ?? null;
+}
+
+/**
+ * Re-broadcast the members list for any rooms `steamId` is in. Called by the
+ * Twitch routes after connect/disconnect so other members see the indicator
+ * change without needing to refresh.
+ */
+export function broadcastMembersForUser(steamId: string): void {
+  rooms.forEach((r) => {
+    if (!r.members.has(steamId)) return;
+    broadcast(r, { type: "members", members: snapshotMembers(r) });
+  });
+}
+
+const BOT_NAME_MIN = 1;
+const BOT_NAME_MAX = 24;
+
+function sanitizeBotName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const code = raw.charCodeAt(i);
+    if (code < 32 || code === 127) continue;
+    out += raw[i];
+  }
+  const cleaned = out.replace(/\s+/g, " ").trim();
+  if (cleaned.length < BOT_NAME_MIN || cleaned.length > BOT_NAME_MAX) return null;
+  return cleaned;
+}
+
+function generateBotId(): string {
+  return `${BOT_ID_PREFIX}${crypto.randomBytes(6).toString("hex")}`;
+}
+
+function botAvatar(name: string): string {
+  const initial = (name.match(/[\p{L}\p{N}]/u)?.[0] ?? "B").toUpperCase();
+  // Slate-grey background to visually distinguish bots from human guest avatars
+  // (which use a hue derived from the name).
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="184" height="184" viewBox="0 0 184 184">` +
+    `<rect width="184" height="184" fill="#3a4150"/>` +
+    `<text x="92" y="120" font-family="sans-serif" font-size="96" font-weight="700" text-anchor="middle" fill="#cbd5e1">${initial}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * Add a synthetic bot member to `code`. Any human member of the room may add a
+ * bot — there's no owner-only gate, since bots are convenience for filling out
+ * draws, not a privileged operation.
+ */
+export function addBot(
+  code: string,
+  requesterSteamId: string,
+  name: string,
+): { bot: RoomMember } | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(requesterSteamId)) return { error: "Pas membre de cette room" };
+  if (r.members.size >= MAX_MEMBERS) return { error: "Room pleine" };
+  const cleanName = sanitizeBotName(name);
+  if (!cleanName) return { error: "Nom de bot invalide" };
+  const botId = generateBotId();
+  const bot: RoomMember = {
+    steamId: botId,
+    displayName: cleanName,
+    avatarUrl: botAvatar(cleanName),
+    profileUrl: "",
+    joinedAt: Date.now(),
+  };
+  r.members.set(botId, bot);
+  touch(r);
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
+  return { bot };
+}
+
+/**
+ * Remove a bot from `code`. Any human member can do this; non-bot ids are
+ * rejected so this can't be used to kick a real player.
+ */
+export function removeBot(
+  code: string,
+  requesterSteamId: string,
+  botSteamId: string,
+): { ok: true } | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(requesterSteamId)) return { error: "Pas membre de cette room" };
+  if (!isBotId(botSteamId)) return { error: "Cible non bot" };
+  if (!r.members.delete(botSteamId)) return { error: "Bot introuvable" };
+  touch(r);
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
+  return { ok: true };
 }
 
 function rebindUserSub(sub: UserOverlaySub) {
@@ -245,7 +358,7 @@ export function joinRoom(code: string, user: SteamSessionUser): RoomSnapshot | {
   const member: RoomMember = { ...user, joinedAt: r.members.get(user.steamId)?.joinedAt ?? Date.now() };
   r.members.set(user.steamId, member);
   touch(r);
-  broadcast(r, { type: "members", members: Array.from(r.members.values()) });
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
   refreshUserOverlaySubs(user.steamId);
   return snapshot(r);
 }
@@ -270,6 +383,12 @@ function removeMember(code: string, steamId: string, deleteIfEmpty: boolean): bo
   }
   const had = r.members.delete(steamId);
   if (!had) return false;
+  // Bots can't subscribe or drive the room — once the last human is gone, drop
+  // any orphan bots so the empty-room handling kicks in normally.
+  const remainingHumans = Array.from(r.members.keys()).filter((id) => !isBotId(id));
+  if (remainingHumans.length === 0 && r.members.size > 0) {
+    r.members.clear();
+  }
   if (r.members.size === 0) {
     if (deleteIfEmpty) {
       clearPendingLeaves(r);
@@ -284,13 +403,14 @@ function removeMember(code: string, steamId: string, deleteIfEmpty: boolean): bo
     refreshUserOverlaySubs(steamId);
     return true;
   }
-  // Promote a new owner if the leaver was the owner.
+  // Promote a new owner if the leaver was the owner. Skip bots — they can't
+  // own rooms (no session, no subscribers).
   if (r.ownerSteamId === steamId) {
-    const next = r.members.values().next().value as RoomMember | undefined;
-    if (next) r.ownerSteamId = next.steamId;
+    const nextHuman = Array.from(r.members.values()).find((m) => !isBotId(m.steamId));
+    if (nextHuman) r.ownerSteamId = nextHuman.steamId;
   }
   touch(r);
-  broadcast(r, { type: "members", members: Array.from(r.members.values()) });
+  broadcast(r, { type: "members", members: snapshotMembers(r) });
   refreshUserOverlaySubs(steamId);
   return true;
 }
@@ -340,20 +460,30 @@ export function cancelPendingLeave(code: string, steamId: string): void {
   }
 }
 
-export function mutateState(
-  code: string,
-  steamId: string,
-  next: GauntletState,
-): RoomSnapshot | { error: string } {
-  const r = rooms.get(code.toUpperCase());
-  if (!r) return { error: "Room introuvable" };
-  if (!r.members.has(steamId)) return { error: "Pas membre de cette room" };
-
+/**
+ * Apply a known-good `next` state to `r`. Handles per-game timing capture,
+ * history → DB persistence, broadcast to subscribers + overlay clients.
+ *
+ * Caller is responsible for any access-control check (membership, ownership,
+ * system-trigger origin, etc.) before invoking this.
+ */
+function applyMutation(r: Room, next: GauntletState): RoomSnapshot {
   const prev = r.state;
   const prevGameId = prev.run[prev.current] ?? null;
   const nextGameId = next.run[next.current] ?? null;
   const runRunning = next.runStartTime !== null;
   const now = Date.now();
+
+  // History entries appended in this mutation — these are the runs to persist.
+  // Capture durations BEFORE the runStartTime-reset block below clears them, so
+  // a single mutation that both completes a run and resets state still ends up
+  // with the right per-game timing for the row we write.
+  const newHistoryEntries =
+    next.history.length > prev.history.length
+      ? next.history.slice(prev.history.length)
+      : [];
+  const persistedDurations: Record<number, number> | null =
+    newHistoryEntries.length > 0 ? { ...r.gameDurations } : null;
 
   // A new run started (or run was reset) → drop stale per-game durations.
   if (next.runStartTime !== prev.runStartTime) {
@@ -368,10 +498,11 @@ export function mutateState(
   for (const id of next.done) {
     if (prevDone.has(id)) continue;
     if (id === prevGameId && r.currentGameStartedAt !== null) {
-      r.gameDurations[id] = Math.max(
-        1,
-        Math.floor((now - r.currentGameStartedAt) / 1000),
-      );
+      const dur = Math.max(1, Math.floor((now - r.currentGameStartedAt) / 1000));
+      r.gameDurations[id] = dur;
+      // Mirror into the persisted snapshot so the final game's time is included
+      // even when run-end and timing-capture happen in the same mutation.
+      if (persistedDurations) persistedDurations[id] = dur;
     }
   }
 
@@ -385,7 +516,48 @@ export function mutateState(
   touch(r);
   broadcast(r, { type: "state", state: next });
   broadcastOverlay(r);
+
+  if (persistedDurations) {
+    const members = Array.from(r.members.values());
+    for (const entry of newHistoryEntries) {
+      recordRun({
+        roomCode: r.code,
+        entry,
+        members,
+        gameDurations: persistedDurations,
+      });
+    }
+  }
+
   return snapshot(r);
+}
+
+export function mutateState(
+  code: string,
+  steamId: string,
+  next: GauntletState,
+): RoomSnapshot | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(steamId)) return { error: "Pas membre de cette room" };
+  return applyMutation(r, next);
+}
+
+/**
+ * System-triggered mutation (Twitch effect, scheduler, etc.). The transform
+ * gets the current state and returns either the new state (applies + broadcasts)
+ * or null (effect doesn't apply right now — caller should refund / drop).
+ */
+export function applyToRoom(
+  code: string,
+  transform: (state: GauntletState) => GauntletState | null,
+): { applied: true; snapshot: RoomSnapshot } | { applied: false; reason: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { applied: false, reason: "no_room" };
+  const next = transform(r.state);
+  if (next === null) return { applied: false, reason: "not_applicable" };
+  if (next === r.state) return { applied: false, reason: "no_change" };
+  return { applied: true, snapshot: applyMutation(r, next) };
 }
 
 /** Subscribe an SSE stream. Caller MUST invoke the returned unsubscribe fn on close. */

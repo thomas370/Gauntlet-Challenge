@@ -2,6 +2,7 @@ name: Deploy PROD
 on:
   push:
     branches: [main]
+    workflow_dispatch:
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -14,8 +15,8 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /home/bortolato/www/Gauntlet-Challenge
-            git stash
+            git stash -u
             git pull origin main
             git stash pop
             npm ci
-            npm run build
+            npm --workspace frontend run build

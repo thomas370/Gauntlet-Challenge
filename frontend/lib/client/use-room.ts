@@ -11,6 +11,8 @@ export interface UseRoomResult {
   members: RoomMember[];
   connected: boolean;
   closed: string | null;
+  addBot: (name: string) => void;
+  removeBot: (botSteamId: string) => void;
 }
 
 export function useRoom(code: string): UseRoomResult {
@@ -121,5 +123,13 @@ export function useRoom(code: string): UseRoomResult {
     [],
   );
 
-  return { state, setState, members, connected, closed };
+  const addBot = useCallback((name: string) => {
+    socketRef.current?.emit("add_bot", { name });
+  }, []);
+
+  const removeBot = useCallback((botSteamId: string) => {
+    socketRef.current?.emit("remove_bot", { botSteamId });
+  }, []);
+
+  return { state, setState, members, connected, closed, addBot, removeBot };
 }

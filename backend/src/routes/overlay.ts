@@ -50,7 +50,6 @@ function preflight(_req: Request, res: Response): void {
 router.options("/:code/events", preflight);
 router.options("/me/:token/events", preflight);
 
-// Per-room SSE feed.
 router.get("/:code/events", (req, res) => {
   setSseHeaders(res);
 
@@ -68,7 +67,6 @@ router.get("/:code/events", (req, res) => {
   res.write(`retry: 1500\n\n`);
   send(result.snapshot);
 
-  // Keep-alive every 15s — proxies (nginx) drop idle streams.
   const keepAlive = setInterval(() => {
     try { res.write(`: ka\n\n`); } catch { /* stream gone */ }
   }, 15_000);
@@ -81,7 +79,6 @@ router.get("/:code/events", (req, res) => {
   req.on("aborted", cleanup);
 });
 
-// Stable per-user SSE feed (auto-hops with whichever room you join).
 router.get("/me/:token/events", (req, res) => {
   const verified = verifyOverlayToken(req.params.token);
   if (!verified) {

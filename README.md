@@ -9,9 +9,9 @@ Monorepo, frontend statique + backend Node.js déployés sur la **même origine*
 ```
 gauntlet-challenge/
   frontend/        # Next.js 14 — static export → frontend/out/
-    app/           # pages (page.tsx solo, /lobby, /login, /pair, /room?code=)
+    app/           # /lobby, /login, /pair, /room (?code=) — / redirige vers /lobby
     lib/           # types, games, hooks client, socket.io-client
-    public/        # covers/ + overlays/ (Twitch widgets)
+    public/        # covers/ + overlays/ Twitch
   backend/         # Express + Socket.io
     src/
       app.ts       # Express app — sert /api/* + frontend/out/
@@ -38,8 +38,6 @@ npm --workspace frontend run build
 # Lancer le backend (sert /api/* + frontend/out/ sur localhost:3000)
 npm --workspace backend run start
 ```
-
-Pour le dev avec hot-reload du frontend : ouvre deux terminaux et lance le backend en watch (`npm run dev:backend`) tout en rebuildant le frontend (`npm --workspace frontend run build` après chaque changement). Le `next dev` natif n'est pas utilisé : il sert le frontend dynamiquement, ce qui contourne le serveur Express et ses routes `/api/*`. Préférable de tout passer par le backend.
 
 ## Déploiement Alwaysdata
 
@@ -89,8 +87,6 @@ Soit dans `backend/.env`, soit dans **Environnement → Variables** côté admin
 curl https://gauntlet.USER.alwaysdata.net/api/me  # → null (pas authentifié)
 ```
 
-Dans le navigateur, ouvrir le domaine → page de login Steam.
-
 ### Redéploiement
 
 ```bash
@@ -104,7 +100,7 @@ npm --workspace frontend run build
 
 10 jeux tirés aléatoirement, le but est de tous les enchaîner sans perdre. Pénalité au choix : reset complet ou recule d'un jeu. Difficulté Normal ou Hardcore. Sélection de 0-5 jeux épinglés, le reste tiré aléatoirement dans le pool de 80.
 
-- `/` — tracker solo (state localStorage, aucun backend requis)
+- `/` → redirige vers `/lobby`
 - `/login` → OAuth Steam
 - `/lobby` → créer / rejoindre une room
 - `/room?code=XXXXXX` → page de jeu multijoueur (Socket.io sync)

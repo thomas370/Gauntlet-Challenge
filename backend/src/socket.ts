@@ -9,6 +9,8 @@ import {
   mutateState,
   schedulePendingLeave,
   cancelPendingLeave,
+  addBot,
+  removeBot,
 } from "./lib/room-store";
 import { verifyToken } from "./lib/verify-token";
 import { SESSION_COOKIE } from "@shared/session-cookie";
@@ -54,7 +56,6 @@ export function attachSocketIO(httpServer: HttpServer): SocketIOServer {
     headers["Cache-Control"] = "no-cache, no-store, must-revalidate";
   });
 
-  // Auth via cookie de session — même cookie que pour les routes Express.
   io.use((socket, next) => {
     const cookies = parseCookies(socket.handshake.headers.cookie ?? "");
     const token = cookies[SESSION_COOKIE];
@@ -122,6 +123,22 @@ export function attachSocketIO(httpServer: HttpServer): SocketIOServer {
       if ("error" in result) {
         console.warn(`[socket] mutate failed for ${user.steamId}: ${result.error}`);
         socket.emit("room_error", { message: result.error, code: "NOT_FOUND" });
+      }
+    });
+
+    socket.on("add_bot", ({ name }: { name?: string }) => {
+      if (!currentCode) return;
+      const result = addBot(currentCode, user.steamId, typeof name === "string" ? name : "");
+      if ("error" in result) {
+        socket.emit("room_error", { message: result.error });
+      }
+    });
+
+    socket.on("remove_bot", ({ botSteamId }: { botSteamId?: string }) => {
+      if (!currentCode || typeof botSteamId !== "string") return;
+      const result = removeBot(currentCode, user.steamId, botSteamId);
+      if ("error" in result) {
+        socket.emit("room_error", { message: result.error });
       }
     });
 

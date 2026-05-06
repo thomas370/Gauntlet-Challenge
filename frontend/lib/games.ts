@@ -18,18 +18,18 @@ export const POOL: Game[] = [
  { id: 14, name: "Rainbow Six Siege", cat: "FPS Compétitif", mode: "team", normal: "Win une partie Quick Match", hardcore: "Win une partie Normal", appid: 359550 },
  { id: 15, name: "Ready or Not", cat: "FPS Coop", mode: "team", normal: "Finir une mission en coop", hardcore: "Mission avec 0 morts civils", appid: 1144200 },
  { id: 16, name: "Team Fortress 2", cat: "FPS Compétitif", mode: "team", normal: "Win une partie de Payload", hardcore: "Win une partie de Payload", appid: 440 },
- { id: 17, name: "DOOM", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survie 20 minutes", hardcore: "Joueur tiré survie 30 minutes", appid: 379720 },
- { id: 18, name: "Payday 2", cat: "FPS Coop", mode: "team", normal: "Réussir une mission", hardcore: "Réussir un mission en Death Sentence", appid: 218620 },
- { id: 19, name: "Left 4 Dead 2", cat: "FPS Coop", mode: "team", normal: "Finir une zone", hardcore: "Finir 3 zone", appid: 550 },
- { id: 20, name: "Back 4 Blood", cat: "FPS Coop", mode: "team", normal: "Finir un zone", hardcore: "Finir 2 zone", appid: 924970 },
+ { id: 17, name: "DOOM", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survit 20 minutes", hardcore: "Joueur tiré survit 30 minutes", appid: 379720 },
+ { id: 18, name: "Payday 2", cat: "FPS Coop", mode: "team", normal: "Réussir une mission", hardcore: "Réussir une mission en Death Sentence", appid: 218620 },
+ { id: 19, name: "Left 4 Dead 2", cat: "FPS Coop", mode: "team", normal: "Finir une zone", hardcore: "Finir 3 zones", appid: 550 },
+ { id: 20, name: "Back 4 Blood", cat: "FPS Coop", mode: "team", normal: "Finir une zone", hardcore: "Finir 2 zones", appid: 924970 },
  { id: 21, name: "Deep Rock Galactic", cat: "FPS Coop", mode: "team", normal: "Finir une mission Hazard 4", hardcore: "Finir une mission Hazard 5", appid: 548430 },
- { id: 22, name: "Risk of Rain 2", cat: "FPS Coop", mode: "team", normal: "Faire 2 etages", hardcore: "Faire 4 etages", appid: 632360 },
+ { id: 22, name: "Risk of Rain 2", cat: "FPS Coop", mode: "team", normal: "Faire 2 étages", hardcore: "Faire 4 étages", appid: 632360 },
 
  // PARTY / COOP FUN
- { id: 23, name: "Rocket League", cat: "Sport", mode: "team", normal: "Win 2 matchs ranked", hardcore: "Win 5 match ranked", appid: 252950 },
+ { id: 23, name: "Rocket League", cat: "Sport", mode: "team", normal: "Win 2 matchs ranked", hardcore: "Win 5 matchs ranked", appid: 252950 },
  { id: 24, name: "Overcooked! 2", cat: "Coop", mode: "team", normal: "3 étoiles sur un niveau Monde 5+", hardcore: "4 étoiles sur un niveau Monde 5+", appid: 728880 },
  { id: 25, name: "Moving Out 2", cat: "Coop", mode: "team", normal: "Finir un niveau", hardcore: "All medals sur un niveau", appid: 2179040 },
- { id: 26, name: "Gang Beasts", cat: "Party", mode: "solo", normal: "un joueur tiré gagne la vague 2", hardcore: "Joueur tiré gagne les vague", appid: 285900 },
+ { id: 26, name: "Gang Beasts", cat: "Party", mode: "solo", normal: "Un joueur tiré gagne la vague 2", hardcore: "Joueur tiré gagne les vagues", appid: 285900 },
  { id: 27, name: "Human Fall Flat", cat: "Coop", mode: "team", normal: "Finir un niveau coop", hardcore: "Speedrun un niveau (record team)", appid: 477160 },
  { id: 28, name: "Move or Die", cat: "Party", mode: "team", soloHardcore: true, normal: "Win une partie", hardcore: "Joueur tiré gagne 5 rounds d'affilée", appid: 323850 },
  { id: 29, name: "Ultimate Chicken Horse", cat: "Party", mode: "team", normal: "Atteindre 5 points", hardcore: "Atteindre 10 points", appid: 386940 },
@@ -45,62 +45,62 @@ export const POOL: Game[] = [
 
  // HORROR / DEDUCTION / COOP
  { id: 39, name: "Phasmophobia", cat: "Horror Coop", mode: "team", normal: "Identifier le ghost", hardcore: "Identifier le ghost en Nightmare", appid: 739630 },
- { id: 40, name: "Lethal Company", cat: "Horror Coop", mode: "team", normal: "Acheter la premiére lune", hardcore: "Atteindre quota 3000+", appid: 1966720 },
- { id: 41, name: "R.E.P.O.", cat: "Horror Coop", mode: "team", normal: "Finir les 3 premiére room", hardcore: "Atteindre quota légendaire (lvl 10+)", appid: 3241660 },
+ { id: 40, name: "Lethal Company", cat: "Horror Coop", mode: "team", normal: "Acheter la première lune", hardcore: "Atteindre quota 3000+", appid: 1966720 },
+ { id: 41, name: "R.E.P.O.", cat: "Horror Coop", mode: "team", normal: "Finir les 3 premières rooms", hardcore: "Atteindre quota légendaire (lvl 10+)", appid: 3241660 },
  { id: 42, name: "Content Warning", cat: "Horror Coop", mode: "team", normal: "Obtenir 100k+ vues sur une vidéo", hardcore: "Atteindre le Star (3 jours all-time)", appid: 2881650 },
  { id: 43, name: "Buckshot Roulette", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré gagne une partie Multiplayer", hardcore: "Joueur tiré gagne en Double or Nothing", appid: 2835570 },
 
  // SURVIVAL / SANDBOX
  { id: 44, name: "Minecraft", cat: "Sandbox", mode: "team", normal: "Battre l'Ender Dragon en coop", hardcore: "Battre Wither + Ender Dragon", cover: "/covers/minecraft.jpg" },
  { id: 45, name: "Raft", cat: "Survie", mode: "team", normal: "Survivre 20 minutes sans mourir", hardcore: "Survivre 30 minutes sans mourir", appid: 648800 },
- { id: 46, name: "Peak", cat: "Survie", mode: "team", normal: "Faire le premier biome", hardcore: "Atteindre le 3 eme biome", appid: 3527290, cover: "/covers/peak.jpg" },
+ { id: 46, name: "Peak", cat: "Survie", mode: "team", normal: "Faire le premier biome", hardcore: "Atteindre le 3e biome", appid: 3527290, cover: "/covers/peak.jpg" },
  { id: 47, name: "Half Dead 2", cat: "Survie", mode: "team", normal: "S'échapper en coop", hardcore: "S'échapper en mode Hard", appid: 914260 },
 
  // PUZZLE / NARRATIF
- { id: 48, name: "Portal 2", cat: "Puzzle", mode: "duo", normal: "2 joueurs tirés finissent une chambre coop avec un temps impatie", hardcore: "Finir un chapitre sans mourir", appid: 620 },
+ { id: 48, name: "Portal 2", cat: "Puzzle", mode: "duo", normal: "2 joueurs tirés finissent une chambre coop dans le temps imparti", hardcore: "Finir un chapitre sans mourir", appid: 620 },
  { id: 49, name: "Escape Simulator", cat: "Puzzle", mode: "team", normal: "Finir une room en coop", hardcore: "Finir une room avant le temps de fin", appid: 1435790 },
- { id: 50, name: "Carry The Glass", cat: "Coop", mode: "duo", normal: "2 joueurs tirés finissent les 5 premier checkpoints avec 3 chances", hardcore: "2 joueurs tirés finissent les 5 premier Checkpoints sans casser le verre", appid: 3263320 },
+ { id: 50, name: "Carry The Glass", cat: "Coop", mode: "duo", normal: "2 joueurs tirés finissent les 5 premiers checkpoints avec 3 chances", hardcore: "2 joueurs tirés finissent les 5 premiers checkpoints sans casser le verre", appid: 3263320 },
  { id: 51, name: "Chained Together", cat: "Coop", mode: "team", normal: "Atteindre 500m avec 3 chances", hardcore: "Atteindre 1000m minimum", appid: 2567870 },
 
  // FIGHTING
  { id: 52, name: "Tekken 8", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un match Ranked", hardcore: "Joueur tiré gagne un match Ranked", appid: 1778820 },
- { id: 53, name: "Tekken 7", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un match Ranked", hardcore: "Joueur tiré gagne une Ranked", appid: 389730 },
- { id: 54, name: "Mortal Kombat 1", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne une Ranked", appid: 1971870 },
- { id: 55, name: "Mortal Kombat 11", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne une Ranked", appid: 976310 },
- { id: 56, name: "Street Fighter V", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne une Ranked", appid: 310950 },
- { id: 57, name: "MultiVersus", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un 1v1 Ranked", hardcore: "Joueur tiré gagne 2 games un Ranked", appid: 1818750 },
+ { id: 53, name: "Tekken 7", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un match Ranked", hardcore: "Joueur tiré gagne un match Ranked", appid: 389730 },
+ { id: 54, name: "Mortal Kombat 1", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne un Ranked", appid: 1971870 },
+ { id: 55, name: "Mortal Kombat 11", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne un Ranked", appid: 976310 },
+ { id: 56, name: "Street Fighter V", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne un Ranked", appid: 310950 },
+ { id: 57, name: "MultiVersus", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un 1v1 Ranked", hardcore: "Joueur tiré gagne 2 games en Ranked", appid: 1818750 },
  { id: 58, name: "Brawlhalla", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un 1v1 Ranked", hardcore: "Joueur tiré gagne un 1v1 Ranked", appid: 291550 },
  { id: 59, name: "Injustice 2", cat: "Fighting", mode: "solo", normal: "Joueur tiré gagne un Ranked", hardcore: "Joueur tiré gagne 3 games d'affilée", appid: 627270 },
  { id: 60, name: "Furi", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré bat un boss", hardcore: "Joueur tiré bat un boss en Furier", appid: 423230 },
 
  // RACING / SPORT
  { id: 61, name: "Trackmania", cat: "Racing", mode: "duo", normal: "2 joueurs tirés gagnent un match Ranked", hardcore: "2 joueurs tirés gagnent 2 Ranked d'affilée", appid: 2225070 },
- { id: 62, name: "Wreckfest", cat: "Racing", mode: "team", soloHardcore: true, normal: "top 5 sur une course", hardcore: "Joueur tiré finit P1 sur une course", appid: 228380 },
+ { id: 62, name: "Wreckfest", cat: "Racing", mode: "team", soloHardcore: true, normal: "Top 5 sur une course", hardcore: "Joueur tiré finit P1 sur une course", appid: 228380 },
  { id: 63, name: "Riders Republic", cat: "Racing", mode: "team", normal: "Top 20 sur une mass race", hardcore: "Top 10 sur une mass race", appid: 2290180 },
- { id: 64, name: "Lonely Mountains: Downhill", cat: "Solo Champion", mode: "solo", normal: "Médaille OR sur une piste bleu", hardcore: "finir une piste noir en OR sur une piste", appid: 711540 },
+ { id: 64, name: "Lonely Mountains: Downhill", cat: "Solo Champion", mode: "solo", normal: "Médaille OR sur une piste bleue", hardcore: "Médaille OR sur une piste noire", appid: 711540 },
  { id: 65, name: "EA Sports FC 25", cat: "Sport", mode: "team", normal: "Win un match Pro Clubs", hardcore: "Win 2 Pro Clubs d'affilée", appid: 2669320 },
  { id: 66, name: "Rematch", cat: "Sport", mode: "team", normal: "Win un match", hardcore: "Win un match Ranked", appid: 2670630 },
 
  // RHYTHM / SOLO CHAMPION
  { id: 67, name: "Beat Saber", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré FC une map normal", hardcore: "Joueur tiré FC une map Expert+", appid: 620980 },
  { id: 68, name: "OSU!", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré pass une map 3★+", hardcore: "Joueur tiré FC une map 5★+", cover: "/covers/osu.png" },
- { id: 69, name: "A Dance of Fire and Ice", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré finit un niveau choisit", hardcore: "Joueur tiré finit un niveau personnalisé choisir", appid: 977950 },
- { id: 70, name: "Celeste", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré finit 2 niveau choisit", hardcore: "Joueur tiré finit un chapitre B-Side", appid: 504230 },
+ { id: 69, name: "A Dance of Fire and Ice", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré finit un niveau choisi", hardcore: "Joueur tiré finit un niveau personnalisé choisi", appid: 977950 },
+ { id: 70, name: "Celeste", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré finit 2 niveaux choisis", hardcore: "Joueur tiré finit un chapitre B-Side", appid: 504230 },
 
  // ROGUELITE / SOLO
- { id: 71, name: "Balatro", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré win une run avec une deck Aleatoire", hardcore: "Joueur tiré win en Stake Gold+ avec une deck Aleatoire", appid: 2379780 },
+ { id: 71, name: "Balatro", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré win une run avec un deck aléatoire", hardcore: "Joueur tiré win en Stake Gold+ avec un deck aléatoire", appid: 2379780 },
  { id: 72, name: "Megabonk", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survit 20 minutes", hardcore: "Joueur tiré win en mode hard", appid: 3405340 },
  { id: 73, name: "Brotato", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré franchit la vague 5", hardcore: "Joueur tiré franchit vague 10", appid: 1942280 },
- { id: 74, name: "Vampire Survivors", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survit 30 minutes", hardcore: "Joueur tiré survie 40 minutes", appid: 1794680 },
+ { id: 74, name: "Vampire Survivors", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survit 30 minutes", hardcore: "Joueur tiré survit 40 minutes", appid: 1794680 },
  { id: 75, name: "20 Minutes Till Dawn", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré survit 20 minutes", hardcore: "Joueur tiré finit un boss en hard", appid: 1966900 },
  { id: 76, name: "Timberman", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré atteint score 100+", hardcore: "Joueur tiré atteint score 250+", appid: 398710 },
 
  // MOBA / TD
  { id: 77, name: "League of Legends", cat: "MOBA", mode: "team", normal: "Win une partie en Aram", hardcore: "Win une partie Ranked Flex", cover: "/covers/league-of-legends.jpg" },
- { id: 78, name: "Artisan TD", cat: "Coop", mode: "solo", normal: "Un joueur tiré Finir un niveau en mode Normal", hardcore: "Un joueur tiré Finir un niveau en mode Vétérant", appid: 2224640 },
+ { id: 78, name: "Artisan TD", cat: "Coop", mode: "solo", normal: "Un joueur tiré finit un niveau en mode Normal", hardcore: "Un joueur tiré finit un niveau en mode Vétéran", appid: 2224640 },
 
  // QUIZ / DIVERS
- { id: 79, name: "Qui veut gagner des millions", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré atteint pallier 2", hardcore: "Joueur tiré gagne sans utiliser de joker", appid: 1356240 },
+ { id: 79, name: "Qui veut gagner des millions", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré atteint palier 2", hardcore: "Joueur tiré gagne sans utiliser de joker", appid: 1356240 },
  { id: 80, name: "The Escapists", cat: "Coop", mode: "team", normal: "Réussir une évasion en coop", hardcore: "Évasion sans déclencher d'alarme", appid: 298630 },
  { id: 81, name: "Final Sentence", cat: "Battle Royale", mode: "solo", normal: "Joueur tiré au sort Top 10 en Classic BR", hardcore: "Joueur tiré GAGNE une Classic BR ou un Duel", appid: 2413950 },
 

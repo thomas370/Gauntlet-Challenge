@@ -11,7 +11,6 @@ const router = Router();
 
 const MAX_BATCH = 100;
 
-// POST /api/steam/owns — batch ownership lookup.
 router.post("/owns", requireAuth, async (req, res) => {
   try {
     const user = req.user!;
@@ -63,7 +62,6 @@ router.post("/owns", requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/steam/owns/:appId — single-game ownership lookup.
 router.get("/owns/:appId", requireAuth, async (req, res) => {
   try {
     const user = req.user!;
@@ -109,7 +107,6 @@ router.get("/cover/:appid", async (req, res) => {
       res.set("Content-Type", upstream.headers.get("content-type") ?? "image/jpeg");
       res.set("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
       res.set("Access-Control-Allow-Origin", "*");
-      // Stream the body. Fetch's body is a web stream; pipe it via Node's reader.
       const reader = upstream.body.getReader();
       const pump = async (): Promise<void> => {
         try {
