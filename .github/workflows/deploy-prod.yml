@@ -9,16 +9,21 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
+          envs: GH_TOKEN
           script: |
             set -euo pipefail
             cd /home/bortolato/www/Gauntlet-Challenge
-            git fetch origin main
-            git reset --hard origin/main
+            # One-shot HTTPS auth via Actions-issued token. Token is used only
+            # for this fetch — never written to .git/config or shell history.
+            git fetch "https://x-access-token:${GH_TOKEN}@github.com/Circule-studio/Gauntlet-Challenge.git" main
+            git reset --hard FETCH_HEAD
             npm ci
             npm --workspace frontend run build
             # Restart backend so backend code changes take effect.
