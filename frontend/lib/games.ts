@@ -165,6 +165,9 @@ export const POOL: Game[] = [
   { id: 136, name: "Exploding Kittens 2", cat: "Party", mode: "solo", normal: "Joueur tiré gagne une partie", hardcore: "Joueur tiré gagne 3 parties d'affilée", appid: 2999030 },
   { id: 137, name: "We Were Here Together", cat: "Puzzle", mode: "duo", normal: "2 joueurs tirés finissent un chapitre en coop", hardcore: "2 joueurs tirés finissent un chapitre dans le temps imparti", appid: 865360, timer: true },
   { id: 138, name: "Lonely Mountains: Snow Riders", cat: "Solo Champion", mode: "solo", normal: "Médaille OR sur une piste bleue", hardcore: "Médaille OR sur une piste noire", appid: 2545360 },
+  { id: 139, name: "Keep Talking and Nobody Explodes", cat: "Coop", mode: "team", normal: "Désamorcer une bombe en équipe", hardcore: "Désamorcer une bombe Hard sans erreur", appid: 341800, timer: true },
+  { id: 140, name: "Nautical Survival", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré atteint la vague 5", hardcore: "Joueur tiré atteint la vague 10", appid: 2860990 },
+  { id: 141, name: "Deadline Delivery", cat: "Solo Champion", mode: "solo", normal: "Joueur tiré finit une livraison à temps", hardcore: "Joueur tiré finit une livraison sans dégâts ni retard", cover: "/covers/deadline-delivery.jpg" },
 ];
 
 export function getCategories(): string[] {

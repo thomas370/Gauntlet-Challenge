@@ -42,6 +42,7 @@ const ICON_PATHS: Record<string, React.ReactNode> = {
   twitch: (<path d="M21 2H3v16h5v4l4-4h5l4-4V2zM11 11V7M16 11V7"/>),
   bot: (<><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><line x1="12" y1="7" x2="12" y2="11"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></>),
   plus: (<><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>),
+  clock: (<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>),
 };
 function Icon({ name, size = 14, fill = "none" }: { name: string; size?: number; fill?: string }) {
   const path = ICON_PATHS[name];
@@ -1475,19 +1476,34 @@ function RoomPageInner() {
      const mm = String(Math.floor(totalSec / 60)).padStart(2, "0");
      const ss = String(totalSec % 60).padStart(2, "0");
      return (
-       <div className={`game-timer ${expired ? "expired" : ""}`}>
+       <div className={`game-timer ${expired ? "expired" : ""} ${deadline !== null ? "running" : ""}`}>
+         <span className="game-timer-icon" aria-hidden="true"><Icon name="clock" size={14} /></span>
          {deadline === null ? (
            <>
-             <label className="game-timer-label">Minuteur :</label>
-             <input
-               type="number"
-               className="game-timer-input"
-               min={1}
-               max={120}
-               value={timerInputMin}
-               onChange={(e) => setTimerInputMin(Number(e.target.value))}
-               aria-label="Durée en minutes"
-             />
+             <span className="game-timer-label">Minuteur</span>
+             <div className="game-timer-stepper">
+               <button
+                 type="button"
+                 className="game-timer-step"
+                 onClick={() => setTimerInputMin((m) => Math.max(1, m - 1))}
+                 aria-label="Diminuer la durée"
+               >−</button>
+               <input
+                 type="number"
+                 className="game-timer-input"
+                 min={1}
+                 max={120}
+                 value={timerInputMin}
+                 onChange={(e) => setTimerInputMin(Number(e.target.value))}
+                 aria-label="Durée en minutes"
+               />
+               <button
+                 type="button"
+                 className="game-timer-step"
+                 onClick={() => setTimerInputMin((m) => Math.min(120, m + 1))}
+                 aria-label="Augmenter la durée"
+               >+</button>
+             </div>
              <span className="game-timer-unit">min</span>
              <button className="btn btn-timer" onClick={() => startTimer(timerInputMin)}>
                Démarrer
@@ -1495,7 +1511,7 @@ function RoomPageInner() {
            </>
          ) : (
            <>
-             <span className="game-timer-label">{expired ? "Temps écoulé !" : "Temps restant :"}</span>
+             <span className="game-timer-label">{expired ? "Temps écoulé" : "Temps restant"}</span>
              <span className="game-timer-clock">{mm}:{ss}</span>
              <button className="btn btn-timer-reset" onClick={resetTimer}>
                Reset
