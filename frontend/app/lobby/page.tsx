@@ -131,6 +131,8 @@ export default function LobbyPage() {
           <a href="/leaderboards/">Classements</a>
           <span aria-hidden>·</span>
           <a href="/games/">Stats par jeu</a>
+          <span aria-hidden>·</span>
+          <a href="/twitch/">Twitch</a>
         </div>
 
         <h1 className="auth-title">Salon</h1>

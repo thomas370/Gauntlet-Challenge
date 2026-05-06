@@ -179,6 +179,11 @@ function findUserRoom(steamId: string): Room | null {
   return best;
 }
 
+/** Public lookup: room code of a user's most recently active room, or null. */
+export function findUserRoomCode(steamId: string): string | null {
+  return findUserRoom(steamId)?.code ?? null;
+}
+
 function rebindUserSub(sub: UserOverlaySub) {
   const target = findUserRoom(sub.steamId);
   sub.boundRoom = target;
@@ -341,15 +346,14 @@ export function cancelPendingLeave(code: string, steamId: string): void {
   }
 }
 
-export function mutateState(
-  code: string,
-  steamId: string,
-  next: GauntletState,
-): RoomSnapshot | { error: string } {
-  const r = rooms.get(code.toUpperCase());
-  if (!r) return { error: "Room introuvable" };
-  if (!r.members.has(steamId)) return { error: "Pas membre de cette room" };
-
+/**
+ * Apply a known-good `next` state to `r`. Handles per-game timing capture,
+ * history → DB persistence, broadcast to subscribers + overlay clients.
+ *
+ * Caller is responsible for any access-control check (membership, ownership,
+ * system-trigger origin, etc.) before invoking this.
+ */
+function applyMutation(r: Room, next: GauntletState): RoomSnapshot {
   const prev = r.state;
   const prevGameId = prev.run[prev.current] ?? null;
   const nextGameId = next.run[next.current] ?? null;
@@ -412,6 +416,34 @@ export function mutateState(
   }
 
   return snapshot(r);
+}
+
+export function mutateState(
+  code: string,
+  steamId: string,
+  next: GauntletState,
+): RoomSnapshot | { error: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { error: "Room introuvable" };
+  if (!r.members.has(steamId)) return { error: "Pas membre de cette room" };
+  return applyMutation(r, next);
+}
+
+/**
+ * System-triggered mutation (Twitch effect, scheduler, etc.). The transform
+ * gets the current state and returns either the new state (applies + broadcasts)
+ * or null (effect doesn't apply right now — caller should refund / drop).
+ */
+export function applyToRoom(
+  code: string,
+  transform: (state: GauntletState) => GauntletState | null,
+): { applied: true; snapshot: RoomSnapshot } | { applied: false; reason: string } {
+  const r = rooms.get(code.toUpperCase());
+  if (!r) return { applied: false, reason: "no_room" };
+  const next = transform(r.state);
+  if (next === null) return { applied: false, reason: "not_applicable" };
+  if (next === r.state) return { applied: false, reason: "no_change" };
+  return { applied: true, snapshot: applyMutation(r, next) };
 }
 
 /** Subscribe an SSE stream. Caller MUST invoke the returned unsubscribe fn on close. */

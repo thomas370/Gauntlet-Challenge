@@ -6,6 +6,9 @@ import { createServer } from "http";
 import { createApp } from "./app";
 import { attachSocketIO } from "./socket";
 import { closeDb, getDb } from "./lib/db";
+import { listAllLinks } from "./lib/twitch-store";
+import { start as startEventSub, stopAll as stopAllEventSub } from "./lib/twitch-eventsub";
+import { ensureRewards } from "./lib/twitch-rewards";
 
 process.on("uncaughtException", (err) => {
   console.error("[server] uncaughtException:", err);
@@ -25,6 +28,20 @@ console.log(`[server] starting (mode=${dev ? "dev" : "prod"} port=${port})`);
 // fast here is the right call: a broken DB means no run history can be saved,
 // and we'd rather know on boot than silently lose runs.
 getDb();
+
+// Spin up an EventSub WebSocket session for each previously-linked Twitch
+// broadcaster, and reconcile their custom rewards. Both are best-effort —
+// failures are logged and the rest of the server still boots.
+for (const link of listAllLinks()) {
+  startEventSub(link.broadcasterId, link.steamId);
+  void ensureRewards(link.broadcasterId, link.steamId).then((res) => {
+    if (!res.ok) {
+      console.warn(
+        `[twitch] ensureRewards for ${link.broadcasterId} failed: ${res.reason} ${res.detail ?? ""}`,
+      );
+    }
+  });
+}
 
 const app = createApp();
 const httpServer = createServer(app);
@@ -48,6 +65,8 @@ const shutdown = (signal: string): void => {
   });
   io.close(() => {
     console.log("[server] socket.io closed");
+    stopAllEventSub();
+    console.log("[server] eventsub stopped");
     closeDb();
     console.log("[server] db closed, exiting");
     process.exit(0);

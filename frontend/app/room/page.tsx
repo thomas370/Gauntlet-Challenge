@@ -752,19 +752,35 @@ function RoomPageInner() {
  const newCurrent = s.current + 1;
  let next: GauntletState = { ...s, done: newDone, current: newCurrent };
  if (newDone.length === s.run.length) {
- // FULL GAUNTLET
+ // FULL GAUNTLET — append the history entry; the celebration useEffect
+ // below picks up the new history[0].id and fires confetti + overlay.
+ // Same code path also handles Twitch-triggered skips that complete the
+ // gauntlet (server appends history, client sees it, useEffect fires).
  next = { ...next, history: logRunToHistory({ ...next }, "win") };
- setTimeout(() => {
- fireConfetti(2);
- playGauntletWin();
- setOverlay({ kind: "win" });
- }, 400);
  }
  return next;
  });
  playClick();
  fireConfetti(0.15);
  };
+
+ // Win-celebration trigger — fires once per winning history entry, regardless
+ // of whether the gauntlet was completed locally (winGame) or remotely
+ // (Twitch skip effect). Deduped via a ref keyed on the entry id.
+ const celebratedWinIdRef = useRef<number | null>(null);
+ useEffect(() => {
+   const top = state.history[0];
+   if (!top || top.outcome !== "win") return;
+   if (state.run.length === 0 || state.done.length !== state.run.length) return;
+   if (celebratedWinIdRef.current === top.id) return;
+   celebratedWinIdRef.current = top.id;
+   const t = setTimeout(() => {
+     fireConfetti(2);
+     playGauntletWin();
+     setOverlay({ kind: "win" });
+   }, 400);
+   return () => clearTimeout(t);
+ }, [state.history, state.run.length, state.done.length]);
 
  const loseGame = (gameId: number) => {
  setState((s) => {

@@ -69,6 +69,53 @@ const MIGRATIONS = `
     PRIMARY KEY (run_id, slot)
   );
   CREATE INDEX IF NOT EXISTS idx_run_games_game ON run_games(game_id, completed);
+
+  -- Twitch OAuth link, one row per Steam user that connected their Twitch.
+  -- No FK to players — a streamer can connect Twitch before playing any run.
+  CREATE TABLE IF NOT EXISTS twitch_links (
+    steam_id        TEXT PRIMARY KEY,
+    broadcaster_id  TEXT NOT NULL UNIQUE,
+    login           TEXT NOT NULL,
+    display_name    TEXT NOT NULL,
+    access_token    TEXT NOT NULL,
+    refresh_token   TEXT NOT NULL,
+    expires_at      INTEGER NOT NULL,
+    scopes          TEXT NOT NULL,
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_twitch_links_broadcaster ON twitch_links(broadcaster_id);
+
+  -- One row per (broadcaster, effect) tying our effect catalog to the Twitch
+  -- custom-reward IDs we created on their channel via the Helix API.
+  CREATE TABLE IF NOT EXISTS twitch_rewards (
+    broadcaster_id TEXT    NOT NULL,
+    effect_key     TEXT    NOT NULL,
+    reward_id      TEXT    NOT NULL,
+    cost           INTEGER NOT NULL,
+    enabled        INTEGER NOT NULL DEFAULT 1,
+    created_at     INTEGER NOT NULL,
+    PRIMARY KEY (broadcaster_id, effect_key)
+  );
+  CREATE INDEX IF NOT EXISTS idx_twitch_rewards_reward ON twitch_rewards(reward_id);
+
+  -- Recent activity log — every redemption and cheer the EventSub session
+  -- received, with whether it triggered an effect. Capped at the last 100
+  -- rows per broadcaster on insert. Used by the /twitch settings page.
+  CREATE TABLE IF NOT EXISTS twitch_events (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    broadcaster_id TEXT    NOT NULL,
+    received_at    INTEGER NOT NULL,
+    source         TEXT    NOT NULL,
+    effect_key     TEXT,
+    applied        INTEGER NOT NULL,
+    fail_reason    TEXT,
+    user_login     TEXT,
+    bits           INTEGER,
+    reward_title   TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_twitch_events_recent
+    ON twitch_events(broadcaster_id, received_at DESC);
 `;
 
 let _db: Database.Database | null = null;
@@ -139,6 +186,10 @@ export function recordRun(args: RecordRunArgs): boolean {
     for (const m of members) {
       upsertPlayer.run(m.steamId, m.displayName, m.avatarUrl, m.profileUrl, entry.ts);
     }
+    // Client stores duration in milliseconds (Date.now() - runStartTime),
+    // but our schema column is duration_s (seconds, matching gameDurations).
+    // Convert here so synthetic test data and real-run data both speak seconds.
+    const durationSeconds = Math.max(1, Math.round(entry.duration / 1000));
     const result = insertRun.run(
       roomCode,
       entry.ts,
@@ -149,7 +200,7 @@ export function recordRun(args: RecordRunArgs): boolean {
       entry.completed,
       entry.total,
       entry.failedGameId,
-      entry.duration,
+      durationSeconds,
     );
     const runId = Number(result.lastInsertRowid);
     for (const m of members) {
